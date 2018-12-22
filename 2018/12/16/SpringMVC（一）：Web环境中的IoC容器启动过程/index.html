@@ -79,17 +79,17 @@
 
 
 
-<meta name="description" content="WebApplicationContextweb环境下默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义： 1234567891011121314public interface WebApplicationContext extends ApplicationContext &amp;#123;    // 用于在ServletC">
+<meta name="description" content="在springmvc项目中，可以有多个容器，而且容器有上下层关系，此处的容器指的是spring容器，它是springmvc的父容器，springmvc容器将在下一章讲解。 WebApplicationContextweb环境下spring默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义： 12345678910111213">
 <meta property="og:type" content="article">
 <meta property="og:title" content="SpringMVC（一）：Web环境中的IoC容器启动过程">
 <meta property="og:url" content="http://yoursite.com/2018/12/16/SpringMVC（一）：Web环境中的IoC容器启动过程/index.html">
 <meta property="og:site_name" content="SHAN">
-<meta property="og:description" content="WebApplicationContextweb环境下默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义： 1234567891011121314public interface WebApplicationContext extends ApplicationContext &amp;#123;    // 用于在ServletC">
+<meta property="og:description" content="在springmvc项目中，可以有多个容器，而且容器有上下层关系，此处的容器指的是spring容器，它是springmvc的父容器，springmvc容器将在下一章讲解。 WebApplicationContextweb环境下spring默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义： 12345678910111213">
 <meta property="og:locale" content="default">
-<meta property="og:updated_time" content="2018-12-16T12:58:51.155Z">
+<meta property="og:updated_time" content="2018-12-21T12:54:17.087Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="SpringMVC（一）：Web环境中的IoC容器启动过程">
-<meta name="twitter:description" content="WebApplicationContextweb环境下默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义： 1234567891011121314public interface WebApplicationContext extends ApplicationContext &amp;#123;    // 用于在ServletC">
+<meta name="twitter:description" content="在springmvc项目中，可以有多个容器，而且容器有上下层关系，此处的容器指的是spring容器，它是springmvc的父容器，springmvc容器将在下一章讲解。 WebApplicationContextweb环境下spring默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义： 12345678910111213">
 
 
 
@@ -299,9 +299,10 @@
       
 
       
-        <h4 id="WebApplicationContext"><a href="#WebApplicationContext" class="headerlink" title="WebApplicationContext"></a>WebApplicationContext</h4><p>web环境下默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义：</p>
+        <p>在springmvc项目中，可以有多个容器，而且容器有上下层关系，此处的容器指的是spring容器，它是springmvc的父容器，springmvc容器将在下一章讲解。</p>
+<h4 id="WebApplicationContext"><a href="#WebApplicationContext" class="headerlink" title="WebApplicationContext"></a>WebApplicationContext</h4><p>web环境下spring默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">WebApplicationContext</span> <span class="keyword">extends</span> <span class="title">ApplicationContext</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 用于在ServletContext取根上下文</span></span><br><span class="line">    String ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE = WebApplicationContext.class.getName() + <span class="string">".ROOT"</span>;</span><br><span class="line">    String SCOPE_REQUEST = <span class="string">"request"</span>;</span><br><span class="line">    String SCOPE_SESSION = <span class="string">"session"</span>;</span><br><span class="line">    String SCOPE_APPLICATION = <span class="string">"application"</span>;</span><br><span class="line">    String SERVLET_CONTEXT_BEAN_NAME = <span class="string">"servletContext"</span>;</span><br><span class="line">    String CONTEXT_PARAMETERS_BEAN_NAME = <span class="string">"contextParameters"</span>;</span><br><span class="line">    String CONTEXT_ATTRIBUTES_BEAN_NAME = <span class="string">"contextAttributes"</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 获取ServletContext</span></span><br><span class="line">    <span class="meta">@Nullable</span></span><br><span class="line">    <span class="function">ServletContext <span class="title">getServletContext</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>（1）WebApplicationContext接口本身中的内容并不多，可以看到它继承了ApplicationContext，有一个ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE成员变量，这个变量用与将IoC容器设置到ServletContext时的key，之后就可以从ServletContext中获取IoC容器。</p>
+<p>（1）WebApplicationContext接口本身中的内容并不多，可以看到它继承了ApplicationContext，有一个ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE成员变量，这个变量用于将IoC容器设置到ServletContext时的key，之后就可以从ServletContext中获取IoC容器。</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">servletContext.setAttribute(WebApplicationConservletContexttext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, <span class="keyword">this</span>.context);</span><br></pre></td></tr></table></figure>
 <p>（2）既然WebApplicationContext只是一个接口，那么一定有一个它的实现类，作为IoC容器的实现，这个类就是XmlWebApplicationContext。</p>
 <h4 id="XmlWebApplicationContext"><a href="#XmlWebApplicationContext" class="headerlink" title="XmlWebApplicationContext"></a>XmlWebApplicationContext</h4><p>Spring使用XmlWebApplicationContext作为默认的WebApplicationContext容器实现，从继承关系中可以看到，XmlWebApplicationContext继承了WebApplicationContext,其实从名字上就可以看出，XmlWebApplicationContext也是ApplicationContext容器的实现，在ApplicationContext的基础之上，增加了对Web环境和XML配置定义的处理。</p>
@@ -327,6 +328,7 @@
 <p>到此，如何进入到XmlWebApplicationContext的loadBeanDefinitions方法中的过程已经很明了了。</p>
 <p><strong>参考：</strong></p>
 <p>spring技术内幕:深入解析spring架构与设计原理</p>
+<p><a href="https://www.cnblogs.com/hafiz/p/5875740.html" target="_blank" rel="noopener">Spring和SpringMVC父子容器关系初窥</a></p>
 <p><strong>Spring版本:5.0.5</strong></p>
 
       
@@ -361,6 +363,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2018/12/21/SpringMVC（二）：DispatcherServlet/" rel="prev" title="SpringMVC（二）：DispatcherServlet对SpringMVC的初始化">
+                SpringMVC（二）：DispatcherServlet对SpringMVC的初始化 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -437,7 +443,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">9</span>
+                  <span class="site-state-item-count">11</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
