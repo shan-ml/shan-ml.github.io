@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT" />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="GET基本流程GET是根据index、type和ID向ES发送请求，获取文档数据，是读取操作，因此主分片或者副本分片都可以返回文档，不过新增的文档已经写入到主分片中但是还没有复制到副本分片时，副本分片可能会报告文档不存在。 假设有三个节点，分别存储着分片0和分片1，P开头的为主分片，R开头的为副本分片：   1.客户端向节点1发送GET请求 2.节点根据文档的ID判断文档属于哪个分片，这里假设文档">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Elasticsearch：GET流程">
+<meta property="og:url" content="http://yoursite.com/2019/01/31/Elasticsearch：GET流程/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="GET基本流程GET是根据index、type和ID向ES发送请求，获取文档数据，是读取操作，因此主分片或者副本分片都可以返回文档，不过新增的文档已经写入到主分片中但是还没有复制到副本分片时，副本分片可能会报告文档不存在。 假设有三个节点，分别存储着分片0和分片1，P开头的为主分片，R开头的为副本分片：   1.客户端向节点1发送GET请求 2.节点根据文档的ID判断文档属于哪个分片，这里假设文档">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/images/es_get_1.png">
+<meta property="og:updated_time" content="2019-01-31T05:51:43.447Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Elasticsearch：GET流程">
+<meta name="twitter:description" content="GET基本流程GET是根据index、type和ID向ES发送请求，获取文档数据，是读取操作，因此主分片或者副本分片都可以返回文档，不过新增的文档已经写入到主分片中但是还没有复制到副本分片时，副本分片可能会报告文档不存在。 假设有三个节点，分别存储着分片0和分片1，P开头的为主分片，R开头的为副本分片：   1.客户端向节点1发送GET请求 2.节点根据文档的ID判断文档属于哪个分片，这里假设文档">
+<meta name="twitter:image" content="http://yoursite.com/images/es_get_1.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/01/31/Elasticsearch：GET流程/"/>
+
+
+
+
+
+  <title>Elasticsearch：GET流程 | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/01/31/Elasticsearch：GET流程/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">Elasticsearch：GET流程</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2019-01-31T13:50:00+08:00">
+                2019-01-31
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h3 id="GET基本流程"><a href="#GET基本流程" class="headerlink" title="GET基本流程"></a>GET基本流程</h3><p>GET是根据index、type和ID向ES发送请求，获取文档数据，是读取操作，因此主分片或者副本分片都可以返回文档，不过新增的文档已经写入到主分片中但是还没有复制到副本分片时，副本分片可能会报告文档不存在。</p>
+<p>假设有三个节点，分别存储着分片0和分片1，P开头的为主分片，R开头的为副本分片：</p>
+<p><img src="/images/es_get_1.png" alt=""> </p>
+<p>1.客户端向节点1发送GET请求</p>
+<p>2.节点根据文档的ID判断文档属于哪个分片，这里假设文档属于分片0，通过集群状态中的内容路由表得知三个节点Node1、Node2、Node3中都含有分片0，此时节点1可以将请求发送给任意节点，假设发给了节点2</p>
+<p>3.节点2根据ID从分片0上获取文档，然后将文档返回给节点1，由节点1返回给客户端</p>
+<h3 id="源码分析"><a href="#源码分析" class="headerlink" title="源码分析"></a>源码分析</h3><h4 id="协调节点"><a href="#协调节点" class="headerlink" title="协调节点"></a>协调节点</h4><h5 id="1-路由"><a href="#1-路由" class="headerlink" title="1.路由"></a>1.路由</h5><ul>
+<li>首先获取集群状态、节点列表等信息</li>
+<li>根据路由算法（或者是请求参数中指定的优先级和集群状态确定）获取文档所在的分片，因为分片可能存在副本，因此得到的是一个列表</li>
+</ul>
+<p><strong>TransportSingleShardAction</strong></p>
+<p>TransportSingleShardAction.AsyncSingleAction的构造函数中，准备集群状态、节点列表等信息，并计算文档所在分片：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">TransportSingleShardAction</span>&lt;<span class="title">Request</span> <span class="keyword">extends</span> <span class="title">SingleShardRequest</span>&lt;<span class="title">Request</span>&gt;, <span class="title">Response</span> <span class="keyword">extends</span> <span class="title">ActionResponse</span>&gt; <span class="keyword">extends</span> <span class="title">TransportAction</span>&lt;<span class="title">Request</span>, <span class="title">Response</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="class"><span class="keyword">class</span> <span class="title">AsyncSingleAction</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">private</span> <span class="keyword">final</span> ActionListener&lt;Response&gt; listener;</span><br><span class="line">        <span class="keyword">private</span> <span class="keyword">final</span> ShardsIterator shardIt;</span><br><span class="line">        <span class="keyword">private</span> <span class="keyword">final</span> InternalRequest internalRequest;</span><br><span class="line">        <span class="keyword">private</span> <span class="keyword">final</span> DiscoveryNodes nodes;</span><br><span class="line">        <span class="keyword">private</span> <span class="keyword">volatile</span> Exception lastFailure;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">private</span> <span class="title">AsyncSingleAction</span><span class="params">(Request request, ActionListener&lt;Response&gt; listener)</span> </span>&#123;</span><br><span class="line">            <span class="keyword">this</span>.listener = listener;</span><br><span class="line">            <span class="comment">// 集群状态</span></span><br><span class="line">            ClusterState clusterState = clusterService.state();</span><br><span class="line">            <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">                logger.trace(<span class="string">"executing [&#123;&#125;] based on cluster state version [&#123;&#125;]"</span>, request, clusterState.version());</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 集群中的节点列表</span></span><br><span class="line">            nodes = clusterState.nodes();</span><br><span class="line">            ClusterBlockException blockException = checkGlobalBlock(clusterState);</span><br><span class="line">            <span class="keyword">if</span> (blockException != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">throw</span> blockException;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            String concreteSingleIndex;</span><br><span class="line">            <span class="keyword">if</span> (resolveIndex(request)) &#123;</span><br><span class="line">                <span class="comment">// 获取索引名称</span></span><br><span class="line">                concreteSingleIndex = indexNameExpressionResolver.concreteSingleIndex(clusterState, request).getName();</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                concreteSingleIndex = request.index();</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 创建InternalRequest对象</span></span><br><span class="line">            <span class="keyword">this</span>.internalRequest = <span class="keyword">new</span> InternalRequest(request, concreteSingleIndex);</span><br><span class="line">            <span class="comment">// 解析请求</span></span><br><span class="line">            resolveRequest(clusterState, internalRequest);</span><br><span class="line">            blockException = checkRequestBlock(clusterState, internalRequest);</span><br><span class="line">            <span class="keyword">if</span> (blockException != <span class="keyword">null</span>) &#123;</span><br><span class="line">                <span class="keyword">throw</span> blockException;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 根据路由算法得到文档属于哪个shard，或者根据请求中设置的参数选择，因为分片可能存在多个副本，因此得到的是一个迭代器</span></span><br><span class="line">            <span class="keyword">this</span>.shardIt = shards(clusterState, internalRequest);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h5 id="2-转发"><a href="#2-转发" class="headerlink" title="2.转发"></a>2.转发</h5><ul>
+<li>根据分片所在的节点ID从集群中的节点列表获取该节点，得到目标节点</li>
+<li><p>调用TransportService的sendRequest方法向目标节点转发请求，在转发之前判断本机节点是否是目标节点：</p>
+<p>  （1）如果本机节点是目标节点，返回的连接是localNodeConnection，进入TransportService的sendLocalRequest流程</p>
+<p>  （2）如果本机节点不是目标节点，返回一个连接目标节点的Connection，然后异步发送请求到网络，等待处理的Response</p>
+</li>
+<li>等待数据节点的回复，如果数据节点处理成功，返回给客户端，如果处理失败进行重试</li>
+</ul>
+<p><strong>TransportSingleShardAction</strong></p>
+<p>TransportSingleShardAction.AsyncSingleAction的perform方法向目标节点转发请求：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">perform</span><span class="params">(@Nullable <span class="keyword">final</span> Exception currentFailure)</span> </span>&#123;</span><br><span class="line"> </span><br><span class="line">    ......</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">final</span> ShardRouting shardRouting = shardIt.nextOrNull();</span><br><span class="line">    ......</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 根据分片所在的节点ID从集群中的节点列表获取该节点，得到目标节点</span></span><br><span class="line">    DiscoveryNode node = nodes.get(shardRouting.currentNodeId());</span><br><span class="line">    <span class="comment">// 如果节点为空抛出异常</span></span><br><span class="line">    <span class="keyword">if</span> (node == <span class="keyword">null</span>) &#123;</span><br><span class="line">        onFailure(shardRouting, <span class="keyword">new</span> NoShardAvailableActionException(shardRouting.shardId()));</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 目标分片的id</span></span><br><span class="line">        internalRequest.request().internalShardId = shardRouting.shardId();</span><br><span class="line">        <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">            logger.trace(</span><br><span class="line">                    <span class="string">"sending request [&#123;&#125;] to shard [&#123;&#125;] on node [&#123;&#125;]"</span>,</span><br><span class="line">                    internalRequest.request(),</span><br><span class="line">                    internalRequest.request().internalShardId,</span><br><span class="line">                    node</span><br><span class="line">            );</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 向目标节点转发请求</span></span><br><span class="line">        transportService.sendRequest(node, transportShardAction, internalRequest.request(), <span class="keyword">new</span> TransportResponseHandler&lt;Response&gt;() &#123;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> Response <span class="title">newInstance</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                <span class="keyword">return</span> newResponse();</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> String <span class="title">executor</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                <span class="keyword">return</span> ThreadPool.Names.SAME;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">handleResponse</span><span class="params">(<span class="keyword">final</span> Response response)</span> </span>&#123;</span><br><span class="line">                listener.onResponse(response);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">handleException</span><span class="params">(TransportException exp)</span> </span>&#123;</span><br><span class="line">                onFailure(shardRouting, exp);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><strong>TransportService</strong></p>
+<p>TransportService实现了sendRequest方法，在转发请求前，调用getConnection判断当前节点是否是目标节点：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">public class TransportService extends AbstractLifecycleComponent &#123;</span><br><span class="line">    public &lt;T extends TransportResponse&gt; void sendRequest(final DiscoveryNode node, final String action,</span><br><span class="line">                                                                final TransportRequest request,</span><br><span class="line">                                                                final TransportResponseHandler&lt;T&gt; handler) &#123;</span><br><span class="line">        try &#123;</span><br><span class="line">            // 获取目标节点的连接</span><br><span class="line">            Transport.Connection connection = getConnection(node);</span><br><span class="line">            // 向目标节点发送请求</span><br><span class="line">            sendRequest(connection, action, request, TransportRequestOptions.EMPTY, handler);</span><br><span class="line">        &#125; catch (NodeNotConnectedException ex) &#123;</span><br><span class="line">            // the caller might not handle this so we invoke the handler</span><br><span class="line">            handler.handleException(ex);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    public Transport.Connection getConnection(DiscoveryNode node) &#123;</span><br><span class="line">        // 判断当前节点是否是目标节点</span><br><span class="line">        if (isLocalNode(node)) &#123;</span><br><span class="line">            return localNodeConnection;</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            // 如果当前节点不是目标节点，获取目标节点的连接</span><br><span class="line">            return transport.getConnection(node);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<h4 id="数据节点"><a href="#数据节点" class="headerlink" title="数据节点"></a>数据节点</h4><p>数据节点收到协调节点的请求，读取数据并返回Response，入口在TransportSingleShardAction.ShardTransportHandler的messageReceived方法中。</p>
+<p><strong>TransportSingleShardAction</strong></p>
+<p>TransportSingleShardAction.ShardTransportHandler的messageReceived是接收协调节点请求的入口：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">public abstract class TransportSingleShardAction&lt;Request extends SingleShardRequest&lt;Request&gt;, Response extends ActionResponse&gt; extends TransportAction&lt;Request, Response&gt; &#123;</span><br><span class="line"></span><br><span class="line">    private class ShardTransportHandler implements TransportRequestHandler&lt;Request&gt; &#123;</span><br><span class="line"></span><br><span class="line">        @Override</span><br><span class="line">        public void messageReceived(final Request request, final TransportChannel channel) throws Exception &#123;</span><br><span class="line">            if (logger.isTraceEnabled()) &#123;</span><br><span class="line">                logger.trace(&quot;executing [&#123;&#125;] on shard [&#123;&#125;]&quot;, request, request.internalShardId);</span><br><span class="line">            &#125;</span><br><span class="line">            // 读取数据并封装成Response</span><br><span class="line">            Response response = shardOperation(request, request.internalShardId);</span><br><span class="line">            // 发送响应</span><br><span class="line">            channel.sendResponse(response);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><strong>具体的读取过程</strong>：</p>
+<p><strong>TransportGetAction</strong></p>
+<p>TransportGetAction的shardOperation方法中调用了ShardGetService的get方法读取数据并存入GetResult中：<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line">public class TransportGetAction extends TransportSingleShardAction&lt;GetRequest, GetResponse&gt; &#123;</span><br><span class="line"></span><br><span class="line">  @Override</span><br><span class="line">    protected GetResponse shardOperation(GetRequest request, ShardId shardId) &#123;</span><br><span class="line">        IndexService indexService = indicesService.indexServiceSafe(shardId.getIndex());</span><br><span class="line">        IndexShard indexShard = indexService.getShard(shardId.id());</span><br><span class="line">        // 检查是否需要refresh</span><br><span class="line">        if (request.refresh() &amp;&amp; !request.realtime()) &#123;</span><br><span class="line">            indexShard.refresh(&quot;refresh_flag_get&quot;);</span><br><span class="line">        &#125;</span><br><span class="line">        // 调用ShardGetService的get方法读取数据并存入GetResult中</span><br><span class="line">        GetResult result = indexShard.getService().get(request.type(), request.id(), request.storedFields(),</span><br><span class="line">                request.realtime(), request.version(), request.versionType(), request.fetchSourceContext());</span><br><span class="line">        return new GetResponse(result);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><strong>ShardGetService</strong></p>
+<p>ShardGetService的get中又调用了innerGet方法，这里才是核心的数据读取实现:</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">public final class ShardGetService extends AbstractIndexShardComponent &#123;</span><br><span class="line">    private GetResult innerGet(String type, String id, String[] gFields, boolean realtime, long version, VersionType versionType, FetchSourceContext fetchSourceContext) &#123;</span><br><span class="line">        fetchSourceContext = normalizeFetchSourceContent(fetchSourceContext, gFields);</span><br><span class="line">        final Collection&lt;String&gt; types;</span><br><span class="line">        // 处理_all选项</span><br><span class="line">        if (type == null || type.equals(&quot;_all&quot;)) &#123;</span><br><span class="line">            types = mapperService.types();</span><br><span class="line">        &#125; else &#123;</span><br><span class="line">            types = Collections.singleton(type);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        Engine.GetResult get = null;</span><br><span class="line">        for (String typeX : types) &#123;</span><br><span class="line">            Term uidTerm = mapperService.createUidTerm(typeX, id);</span><br><span class="line">            if (uidTerm != null) &#123;</span><br><span class="line">                // 调用indexShard.get获取读取数据，</span><br><span class="line">                get = indexShard.get(new Engine.Get(realtime, typeX, id, uidTerm)</span><br><span class="line">                        .version(version).versionType(versionType));</span><br><span class="line">                if (get.exists()) &#123;</span><br><span class="line">                    type = typeX;</span><br><span class="line">                    break;</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    get.release();</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        if (get == null || get.exists() == false) &#123;</span><br><span class="line">            // 返回结果</span><br><span class="line">            return new GetResult(shardId.getIndexName(), type, id, -1, false, null, null);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        try &#123;</span><br><span class="line">            // 对读取的数据进行过滤</span><br><span class="line">            return innerGetLoadFromStoredFields(type, id, gFields, fetchSourceContext, get, mapperService);</span><br><span class="line">        &#125; finally &#123;</span><br><span class="line">            get.release();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>indexShard.get()方法返回的Engine.GetResult类型，在get方法中又调用了InternalEngine的get方法读取数据</p>
+<p><strong>IndexShard</strong><br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">public class IndexShard extends AbstractIndexShardComponent implements IndicesClusterStateService.Shard &#123;</span><br><span class="line">    public Engine.GetResult get(Engine.Get get) &#123;</span><br><span class="line">        readAllowed();</span><br><span class="line">        return getEngine().get(get, this::acquireSearcher);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><strong>InternalEngine</strong></p>
+<p>InternalEngine的get方法读取数据，在早期的ES版本中，刚写入的数据可以从translog读取，以此达到近实时搜索，所以读取过程中会加锁，处理realtime选项，如果realtime为true，判断是否需要刷盘。ES 5之后不再从translog中读取，只从Lucene中读取，近实时搜索依靠refresh实现。<br><figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line">public class InternalEngine extends Engine &#123;</span><br><span class="line">    @Override</span><br><span class="line">    public GetResult get(Get get, BiFunction&lt;String, SearcherScope, Searcher&gt; searcherFactory) throws EngineException &#123;</span><br><span class="line">        assert Objects.equals(get.uid().field(), uidField) : get.uid().field();</span><br><span class="line">        // 加锁</span><br><span class="line">        try (ReleasableLock ignored = readLock.acquire()) &#123;</span><br><span class="line">            ensureOpen();</span><br><span class="line">            SearcherScope scope;</span><br><span class="line">            // 处理realtime选项。判断是否需要刷盘</span><br><span class="line">            if (get.realtime()) &#123;</span><br><span class="line">                VersionValue versionValue = versionMap.getUnderLock(get.uid().bytes());</span><br><span class="line">                if (versionValue != null) &#123;</span><br><span class="line">                    if (versionValue.isDelete()) &#123;</span><br><span class="line">                        return GetResult.NOT_EXISTS;</span><br><span class="line">                    &#125;</span><br><span class="line">                    if (get.versionType().isVersionConflictForReads(versionValue.version, get.version())) &#123;</span><br><span class="line">                        throw new VersionConflictEngineException(shardId, get.type(), get.id(),</span><br><span class="line">                            get.versionType().explainConflictForReads(versionValue.version, get.version()));</span><br><span class="line">                    &#125;</span><br><span class="line">                    // 执行刷盘操作</span><br><span class="line">                    refresh(&quot;realtime_get&quot;, SearcherScope.INTERNAL);</span><br><span class="line">                &#125;</span><br><span class="line">                scope = SearcherScope.INTERNAL;</span><br><span class="line">            &#125; else &#123;</span><br><span class="line">                </span><br><span class="line">                scope = SearcherScope.EXTERNAL;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            // 调用searcher读取数据</span><br><span class="line">            return getFromSearcher(get, searcherFactory, scope);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p><strong>数据节点读取流程总结</strong>：</p>
+<ul>
+<li>数据节点接收到协调节点的请求读取数据</li>
+<li>读取数据的核心实现是在ShardGetService的innerGet方法中实现的，在这个过程中，又依靠InternalEngine的get方法通过Searcher从Lucene中读取数据，然后innerGetLoadFromStoredFields方法对得到的数据进行过滤</li>
+<li>数据节点将返回结果封装到Response中返回</li>
+</ul>
+<p><strong>参考：</strong></p>
+<p>Elasticsearch源码解析与优化实战【张超】</p>
+<p><strong>Elasticsearch版本:6.1.2</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/01/30/Elasticsearch：写入流程/" rel="next" title="Elasticsearch：写入流程">
+                <i class="fa fa-chevron-left"></i> Elasticsearch：写入流程
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">13</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#GET基本流程"><span class="nav-number">1.</span> <span class="nav-text">GET基本流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#源码分析"><span class="nav-number">2.</span> <span class="nav-text">源码分析</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#协调节点"><span class="nav-number">2.1.</span> <span class="nav-text">协调节点</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#1-路由"><span class="nav-number">2.1.1.</span> <span class="nav-text">1.路由</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#2-转发"><span class="nav-number">2.1.2.</span> <span class="nav-text">2.转发</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#数据节点"><span class="nav-number">2.2.</span> <span class="nav-text">数据节点</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
