@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Hexo, NexT" />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Elasticsearch中Discovery模块负责发现集群中的节点以及Master的选举，其默认的实现称为Zen Discovery。 在Elasticsearch的配置文件中，有一项为node.master，如果将该配置设为true，该节点即可参与Master选举，获得被选举为Master节点的资格。 Master选举算法（1）Paxos算法 Paxos算法在分布式系统中是一种比较著名的选举">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SHAN">
+<meta property="og:url" content="http://yoursite.com/2019/03/25/Elasticsearch：Master选举流程/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="Elasticsearch中Discovery模块负责发现集群中的节点以及Master的选举，其默认的实现称为Zen Discovery。 在Elasticsearch的配置文件中，有一项为node.master，如果将该配置设为true，该节点即可参与Master选举，获得被选举为Master节点的资格。 Master选举算法（1）Paxos算法 Paxos算法在分布式系统中是一种比较著名的选举">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2019-03-25T13:08:02.400Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="SHAN">
+<meta name="twitter:description" content="Elasticsearch中Discovery模块负责发现集群中的节点以及Master的选举，其默认的实现称为Zen Discovery。 在Elasticsearch的配置文件中，有一项为node.master，如果将该配置设为true，该节点即可参与Master选举，获得被选举为Master节点的资格。 Master选举算法（1）Paxos算法 Paxos算法在分布式系统中是一种比较著名的选举">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2019/03/25/Elasticsearch：Master选举流程/"/>
+
+
+
+
+
+  <title> | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/03/25/Elasticsearch：Master选举流程/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline"></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2019-03-25T21:08:02+08:00">
+                2019-03-25
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Elasticsearch中Discovery模块负责发现集群中的节点以及Master的选举，其默认的实现称为Zen Discovery。</p>
+<p>在Elasticsearch的配置文件中，有一项为node.master，如果将该配置设为true，该节点即可参与Master选举，获得被选举为Master节点的资格。</p>
+<h3 id="Master选举算法"><a href="#Master选举算法" class="headerlink" title="Master选举算法"></a>Master选举算法</h3><p>（1）Paxos算法</p>
+<pre><code>Paxos算法在分布式系统中是一种比较著名的选举算法，并且非常强大，但是它实现比较复杂，这里不过多讲解。
+</code></pre><p>（2）Bully算法</p>
+<pre><code>Bully算法假设集群中所有的节点都有一个唯一的ID，通过对ID进行排序，选取ID最大的节点作为Master节点。
+</code></pre><p><strong>brain-split问题</strong></p>
+<p>一个集群建立起之后会选出一个master,负责管理整个集群，当master负载比较大时或者产生网络分区时，导致其他节点可能认为master节点已失效，从而选举新的节点，出现多个master的情况，这就是brain-split问题。<br>ES在选举master时，获得的投票数必须要达到quorum也就是参选人数需要过半，才能确认Master,quorum的数量可以在配置文件中配置discovery.zen.minimum_master_nodes，一般配置数量为集群中具有master资格的节点数除以2加1：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">discovery.zen.minimum_master_nodes: 1</span><br></pre></td></tr></table></figure>
+<h3 id="Elasticsearch-Master选举流程"><a href="#Elasticsearch-Master选举流程" class="headerlink" title="Elasticsearch Master选举流程"></a>Elasticsearch Master选举流程</h3><p>Elasticsearch基于Bully算法，选举流程如下：</p>
+<h4 id="1-Ping所有的节点，选举临时的Master"><a href="#1-Ping所有的节点，选举临时的Master" class="headerlink" title="1.Ping所有的节点，选举临时的Master"></a>1.Ping所有的节点，选举临时的Master</h4><ul>
+<li><strong>fullPingResponses</strong></li>
+</ul>
+<p>选举过程的实现位于ZenDiscovery类的findMaster方法中，在该方法中首先Ping集群中的所有节点，得到返回结果fullPingResponses，fullPingResponses是由集群中的节点组成的列表，但是不包含当前的节点，当前节点单独被添加到fullPingResponses中。接着，将discovery.zen.master_election.ignore_non_master_pings为true并且不具备Master资格的节点过滤掉，并放入pingResponses中。</p>
+<ul>
+<li><strong>activeMasters</strong></li>
+</ul>
+<p>activeMasters存储当前活跃的Master列表，它是通过遍历pingResponses，将每个节点认为的Master节点（并且不是当前节点）加入到activeMasters列表中。</p>
+<ul>
+<li><strong>masterCandidates</strong></li>
+</ul>
+<p>masterCandidates存储Master候选者列表，也就是具有Master资格的节点，它也是通过遍历pingResponses，判断每个节点是否具有Master资格得到的候选者列表。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ZenDiscovery</span> <span class="keyword">extends</span> <span class="title">AbstractLifecycleComponent</span> <span class="keyword">implements</span> <span class="title">Discovery</span>, <span class="title">PingContextProvider</span>, <span class="title">IncomingClusterStateListener</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">innerJoinCluster</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        DiscoveryNode masterNode = <span class="keyword">null</span>;</span><br><span class="line">        <span class="keyword">final</span> Thread currentThread = Thread.currentThread();</span><br><span class="line">        nodeJoinController.startElectionContext();</span><br><span class="line">        <span class="comment">// 如果master为空</span></span><br><span class="line">        <span class="keyword">while</span> (masterNode == <span class="keyword">null</span> &amp;&amp; joinThreadControl.joinThreadActive(currentThread)) &#123;</span><br><span class="line">            <span class="comment">// 选举临时的Master</span></span><br><span class="line">            masterNode = findMaster();</span><br><span class="line">        &#125;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> DiscoveryNode <span class="title">findMaster</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        logger.trace(<span class="string">"starting to ping"</span>);</span><br><span class="line">        <span class="comment">//ping所有的节点，得到节点列表，列表中不包含当前节点</span></span><br><span class="line">        List&lt;ZenPing.PingResponse&gt; fullPingResponses = pingAndWait(pingTimeout).toList();</span><br><span class="line">        <span class="keyword">if</span> (fullPingResponses == <span class="keyword">null</span>) &#123;</span><br><span class="line">            logger.trace(<span class="string">"No full ping responses"</span>);</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">            StringBuilder sb = <span class="keyword">new</span> StringBuilder();</span><br><span class="line">            <span class="keyword">if</span> (fullPingResponses.size() == <span class="number">0</span>) &#123;</span><br><span class="line">                sb.append(<span class="string">" &#123;none&#125;"</span>);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="keyword">for</span> (ZenPing.PingResponse pingResponse : fullPingResponses) &#123;</span><br><span class="line">                    sb.append(<span class="string">"\n\t--&gt; "</span>).append(pingResponse);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            logger.trace(<span class="string">"full ping responses:&#123;&#125;"</span>, sb);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 获取当前节点</span></span><br><span class="line">        <span class="keyword">final</span> DiscoveryNode localNode = transportService.getLocalNode();</span><br><span class="line"></span><br><span class="line">        <span class="comment">// add our selves</span></span><br><span class="line">        <span class="keyword">assert</span> fullPingResponses.stream().map(ZenPing.PingResponse::node)</span><br><span class="line">            .filter(n -&gt; n.equals(localNode)).findAny().isPresent() == <span class="keyword">false</span>;</span><br><span class="line">        <span class="comment">// 将当前节点加入节点列表</span></span><br><span class="line">        fullPingResponses.add(<span class="keyword">new</span> ZenPing.PingResponse(localNode, <span class="keyword">null</span>, <span class="keyword">this</span>.clusterState()));</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 过滤节点，将discovery.zen.master_election.ignore_non_master_pings为true并且不具备Master资格的节点过滤掉</span></span><br><span class="line">        <span class="keyword">final</span> List&lt;ZenPing.PingResponse&gt; pingResponses = filterPingResponses(fullPingResponses, masterElectionIgnoreNonMasters, logger);</span><br><span class="line">        <span class="comment">// activeMasters存储当前活跃的Master列表</span></span><br><span class="line">        List&lt;DiscoveryNode&gt; activeMasters = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line">        <span class="comment">// 遍历ping后得到的节点列表</span></span><br><span class="line">        <span class="keyword">for</span> (ZenPing.PingResponse pingResponse : pingResponses) &#123;</span><br><span class="line">            <span class="comment">// 如果每个节点选举出的Master节点不为空并且不是当前节点</span></span><br><span class="line">            <span class="keyword">if</span> (pingResponse.master() != <span class="keyword">null</span> &amp;&amp; !localNode.equals(pingResponse.master())) &#123;</span><br><span class="line">                <span class="comment">// 将推举出的master节点加入到activeMasters中</span></span><br><span class="line">                activeMasters.add(pingResponse.master());</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// masterCandidates存储Master候选者列表</span></span><br><span class="line">        List&lt;ElectMastermasterCandidatesService.MasterCandidate&gt; masterCandidates = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line">        <span class="comment">// 再次遍历集群中的节点列表</span></span><br><span class="line">        <span class="keyword">for</span> (ZenPing.PingResponse pingResponse : pingResponses) &#123;</span><br><span class="line">            <span class="comment">// 如果节点具有Master资格</span></span><br><span class="line">            <span class="keyword">if</span> (pingResponse.node().isMasterNode()) &#123;</span><br><span class="line">                <span class="comment">// 加入到masterCandidates候选者列表中</span></span><br><span class="line">                masterCandidates.add(<span class="keyword">new</span> ElectMasterService.MasterCandidate(pingResponse.node(), pingResponse.getClusterStateVersion()));</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 如果当前活跃的Master列表为空</span></span><br><span class="line">        <span class="keyword">if</span> (activeMasters.isEmpty()) &#123;</span><br><span class="line">            <span class="comment">// 从候选者Master列表中判断是否达到法定人数</span></span><br><span class="line">            <span class="keyword">if</span> (electMaster.hasEnoughCandidates(masterCandidates)) &#123;</span><br><span class="line">                <span class="comment">// 选举出Master节点</span></span><br><span class="line">                <span class="keyword">final</span> ElectMasterService.MasterCandidate winner = electMaster.electMaster(masterCandidates);</span><br><span class="line">                logger.trace(<span class="string">"candidate &#123;&#125; won election"</span>, winner);</span><br><span class="line">                <span class="comment">// 返回Master节点</span></span><br><span class="line">                <span class="keyword">return</span> winner.getNode();</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="comment">// 如果没有足够的候选者，返回空</span></span><br><span class="line">                logger.warn(<span class="string">"not enough master nodes discovered during pinging (found [&#123;&#125;], but needed [&#123;&#125;]), pinging again"</span>,</span><br><span class="line">                            masterCandidates, electMaster.minimumMasterNodes());</span><br><span class="line">                <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">// 判断当前节点是否在活跃的Master列表中</span></span><br><span class="line">            <span class="keyword">assert</span> !activeMasters.contains(localNode) : <span class="string">"local node should never be elected as master when other nodes indicate an active master"</span>;</span><br><span class="line">            <span class="comment">// 选举Master节点</span></span><br><span class="line">            <span class="keyword">return</span> electMaster.tieBreakActiveMasters(activeMasters);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="具体选举过程"><a href="#具体选举过程" class="headerlink" title="具体选举过程"></a>具体选举过程</h5><p>首先判断activeMasters是否为空，如果不为空，从activeMasters选举。如果为空，判断masterCandidates中候选者是否达到了法定人数  quorum，如果达到，从中选举Master节点，如果未到达，重新获取节点。</p>
+<p><strong>（1）从masterCandidates选举</strong></p>
+<p>具体的实现在ElectMasterService中:</p>
+<p><strong>判断是否到达法定人数</strong></p>
+<ul>
+<li>判断masterCandidates是否为空，为空返回false</li>
+<li>判断discovery.zen.minimum_master_nodes配置的值（默认值为-1）是否小于1，确保单节点情况下的正常选主</li>
+<li>判断masterCandidates中具备master资格的节点数据是否大于等于minimum_master_nodes</li>
+</ul>
+<p><strong>选举临时Master</strong></p>
+<ul>
+<li>首先对masterCandidates中的节点进行排序，优先使用版本号，版本号最高的排在前面，如果版本号一致，再跟进节点ID进行排序，节点ID小的排在前面</li>
+<li>返回排序后最前面的节点，也就是第一个节点作为Master节点</li>
+</ul>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ElectMasterService</span> <span class="keyword">extends</span> <span class="title">AbstractComponent</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 是否达到法定人数</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">hasEnoughCandidates</span><span class="params">(Collection&lt;MasterCandidate&gt; candidates)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 如果为空返回false</span></span><br><span class="line">        <span class="keyword">if</span> (candidates.isEmpty()) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">false</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// minimumMasterNodes默认值为-1，确保单节点情况下正常选主</span></span><br><span class="line">        <span class="keyword">if</span> (minimumMasterNodes &lt; <span class="number">1</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">assert</span> candidates.stream().map(MasterCandidate::getNode).collect(Collectors.toSet()).size() == candidates.size() :</span><br><span class="line">            <span class="string">"duplicates ahead: "</span> + candidates;</span><br><span class="line">        <span class="comment">// 判断是否达到法定人数</span></span><br><span class="line">        <span class="keyword">return</span> candidates.size() &gt;= minimumMasterNodes;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 选举Master</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> MasterCandidate <span class="title">electMaster</span><span class="params">(Collection&lt;MasterCandidate&gt; candidates)</span> </span>&#123;</span><br><span class="line">        <span class="function"><span class="keyword">assert</span> <span class="title">hasEnoughCandidates</span><span class="params">(candidates)</span></span>;</span><br><span class="line">        List&lt;MasterCandidate&gt; sortedCandidates = <span class="keyword">new</span> ArrayList&lt;&gt;(candidates);</span><br><span class="line">        <span class="comment">// 对节点进行排序</span></span><br><span class="line">        sortedCandidates.sort(MasterCandidate::compare);</span><br><span class="line">        <span class="comment">// 获取排序后的第一个节点作为Master节点</span></span><br><span class="line">        <span class="keyword">return</span> sortedCandidates.get(<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 内部类，自定义比较函数在此类中实现</span></span><br><span class="line">     <span class="keyword">public</span> <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">MasterCandidate</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">long</span> UNRECOVERED_CLUSTER_VERSION = -<span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> DiscoveryNode node;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">long</span> clusterStateVersion;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="title">MasterCandidate</span><span class="params">(DiscoveryNode node, <span class="keyword">long</span> clusterStateVersion)</span> </span>&#123;</span><br><span class="line">            Objects.requireNonNull(node);</span><br><span class="line">            <span class="keyword">assert</span> clusterStateVersion &gt;= -<span class="number">1</span> : <span class="string">"got: "</span> + clusterStateVersion;</span><br><span class="line">            <span class="keyword">assert</span> node.isMasterNode();</span><br><span class="line">            <span class="keyword">this</span>.node = node;</span><br><span class="line">            <span class="keyword">this</span>.clusterStateVersion = clusterStateVersion;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">public</span> DiscoveryNode <span class="title">getNode</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> node;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">long</span> <span class="title">getClusterStateVersion</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> clusterStateVersion;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> String <span class="title">toString</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="string">"Candidate&#123;"</span> +</span><br><span class="line">                <span class="string">"node="</span> + node +</span><br><span class="line">                <span class="string">", clusterStateVersion="</span> + clusterStateVersion +</span><br><span class="line">                <span class="string">'&#125;'</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/**</span></span><br><span class="line"><span class="comment">         * 自定义比较函数，早期版本中对节点ID排序，现在优先使集群状态版本号排序，版本号高的放在前面，版本号一致的再对比节点ID，节点ID小的排前面</span></span><br><span class="line"><span class="comment">         */</span></span><br><span class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">compare</span><span class="params">(MasterCandidate c1, MasterCandidate c2)</span> </span>&#123;</span><br><span class="line">            <span class="comment">// 比较版本号，注意这里c2在前</span></span><br><span class="line">            <span class="keyword">int</span> ret = Long.compare(c2.clusterStateVersion, c1.clusterStateVersion);</span><br><span class="line">            <span class="keyword">if</span> (ret == <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="comment">// 如果版本号一致比较节点的ID</span></span><br><span class="line">                ret = compareNodes(c1.getNode(), c2.getNode());</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> ret;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/** </span></span><br><span class="line"><span class="comment">     *  根据节点ID比较大小</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">     <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">compareNodes</span><span class="params">(DiscoveryNode o1, DiscoveryNode o2)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 判断是否具有master节点资格是为了给其他函数调用的，masterCandidates中的节点都已经具备了master节点资格</span></span><br><span class="line">        <span class="comment">// 如果o1具备Master节点资格，o2不具备，返回-1，也就是o1排前面</span></span><br><span class="line">        <span class="keyword">if</span> (o1.isMasterNode() &amp;&amp; !o2.isMasterNode()) &#123;</span><br><span class="line">            <span class="keyword">return</span> -<span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 如果o1不具备master节点资格而o2有，返回1，o2排前面</span></span><br><span class="line">        <span class="keyword">if</span> (!o1.isMasterNode() &amp;&amp; o2.isMasterNode()) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 比较节点的ID</span></span><br><span class="line">        <span class="keyword">return</span> o1.getId().compareTo(o2.getId());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>（2）从activeMasters选举</strong></p>
+<p>从activeMasters选举的过程比较简单，具体的实现也在ElectMasterService中。首先通过compareNodes方法对节点ID排序，然后取节点ID最小的作为临时的Master。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ElectMasterService</span> <span class="keyword">extends</span> <span class="title">AbstractComponent</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> DiscoveryNode <span class="title">tieBreakActiveMasters</span><span class="params">(Collection&lt;DiscoveryNode&gt; activeMasters)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 取activeMasters中节点ID最小的作为Master，同样使用compareNodes进行排序</span></span><br><span class="line">        <span class="keyword">return</span> activeMasters.stream().min(ElectMasterService::compareNodes).get();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">     <span class="comment">/** </span></span><br><span class="line"><span class="comment">     *  根据节点ID比较大小</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">     <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">compareNodes</span><span class="params">(DiscoveryNode o1, DiscoveryNode o2)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 判断是否具有master节点资格是为了给其他函数调用的，masterCandidates中的节点都已经具备了master节点资格</span></span><br><span class="line">        <span class="comment">// 如果o1具备Master节点资格，o2不具备，返回-1，也就是o1排前面</span></span><br><span class="line">        <span class="keyword">if</span> (o1.isMasterNode() &amp;&amp; !o2.isMasterNode()) &#123;</span><br><span class="line">            <span class="keyword">return</span> -<span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 如果o1不具备master节点资格而o2有，返回1，o2排前面</span></span><br><span class="line">        <span class="keyword">if</span> (!o1.isMasterNode() &amp;&amp; o2.isMasterNode()) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 比较节点的ID</span></span><br><span class="line">        <span class="keyword">return</span> o1.getId().compareTo(o2.getId());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="2-确立Master"><a href="#2-确立Master" class="headerlink" title="2.确立Master"></a>2.确立Master</h4><p>上一步选举出的临时的Master有两种情况，临时Master就是当前节点或者临时Master不是当前节点。<br>在ES中，向节点发送join请求就是发送投票，被发送请求的节点将会得到一票。</p>
+<p><strong>（1）临时Master节点为当前节点</strong></p>
+<ul>
+<li>等待足够多的具有Master资格的节点加入本节点，达到法定人数的投票数量时完成选主</li>
+<li>如果等待超时后还没有满足法定数量，选举失败，将会进行新一轮的选举</li>
+<li>如果选主成功，将会发布新的cluster state version</li>
+</ul>
+<p><strong><strong>ZenDiscovery</strong></strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ZenDiscovery</span> <span class="keyword">extends</span> <span class="title">AbstractLifecycleComponent</span> <span class="keyword">implements</span> <span class="title">Discovery</span>, <span class="title">PingContextProvider</span>, <span class="title">IncomingClusterStateListener</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">innerJoinCluster</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        DiscoveryNode masterNode = <span class="keyword">null</span>;</span><br><span class="line">        <span class="keyword">final</span> Thread currentThread = Thread.currentThread();</span><br><span class="line">        nodeJoinController.startElectionContext();</span><br><span class="line">        <span class="comment">// 如果master为空</span></span><br><span class="line">        <span class="keyword">while</span> (masterNode == <span class="keyword">null</span> &amp;&amp; joinThreadControl.joinThreadActive(currentThread)) &#123;</span><br><span class="line">            <span class="comment">// 选举临时的Master</span></span><br><span class="line">            masterNode = findMaster();</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (!joinThreadControl.joinThreadActive(currentThread)) &#123;</span><br><span class="line">            logger.trace(<span class="string">"thread is no longer in currentJoinThread. Stopping."</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 如果选举出的Master节点是当前节点</span></span><br><span class="line">        <span class="keyword">if</span> (transportService.getLocalNode().equals(masterNode)) &#123;</span><br><span class="line">            <span class="comment">// 因为选举出的Master节点是当前节点，所以minimum_master_nodes数量-1，得到被选举为Master需要的最少节点数量，也就是法定人数</span></span><br><span class="line">            <span class="keyword">final</span> <span class="keyword">int</span> requiredJoins = Math.max(<span class="number">0</span>, electMaster.minimumMasterNodes() - <span class="number">1</span>); </span><br><span class="line">            logger.debug(<span class="string">"elected as master, waiting for incoming joins ([&#123;&#125;] needed)"</span>, requiredJoins);</span><br><span class="line">            <span class="comment">// 根据法定人数等待其他节点的加入（投票），等待完成选举</span></span><br><span class="line">            nodeJoinController.waitToBeElectedAsMaster(requiredJoins, masterElectionWaitForJoinsTimeout,</span><br><span class="line">                    <span class="keyword">new</span> NodeJoinController.ElectionCallback() &#123;<span class="comment">// 回调函数</span></span><br><span class="line">                        <span class="meta">@Override</span></span><br><span class="line">                        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onElectedAsMaster</span><span class="params">(ClusterState state)</span> </span>&#123;</span><br><span class="line">                            <span class="keyword">synchronized</span> (stateMutex) &#123;</span><br><span class="line">                               <span class="comment">// 选举完成 joinThreadControl.markThreadAsDone(currentThread);</span></span><br><span class="line">                            &#125;</span><br><span class="line">                        &#125;</span><br><span class="line"></span><br><span class="line">                        <span class="meta">@Override</span></span><br><span class="line">                        <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onFailure</span><span class="params">(Throwable t)</span> </span>&#123;<span class="comment">// 如果选举失败</span></span><br><span class="line">                            logger.trace(<span class="string">"failed while waiting for nodes to join, rejoining"</span>, t);</span><br><span class="line">                            <span class="keyword">synchronized</span> (stateMutex) &#123;</span><br><span class="line">                               <span class="comment">// 重新选举 joinThreadControl.markThreadAsDoneAndStartNew(currentThread);</span></span><br><span class="line">                            &#125;</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125;</span><br><span class="line"></span><br><span class="line">            );</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            ......</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>（2）临时Master节点不是当前节点</strong></p>
+<ul>
+<li>当前节点停止接收其他节点的join请求</li>
+<li>最终当选的Master会先发布集群状态，之后确认其他节点的join请求。</li>
+<li>当前节点向Master节点发送join请求，并且等待Master的回复（默认为1分钟），如果失败重新发送join请求（默认重试3次），如果回复成功，从集群中获取Master节点，判断与临时Master是否一致，如果不一致重新选举。</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">public class ZenDiscovery extends AbstractLifecycleComponent implements Discovery, PingContextProvider, IncomingClusterStateListener &#123;</span><br><span class="line"></span><br><span class="line">    private void innerJoinCluster() &#123;</span><br><span class="line">    </span><br><span class="line">        ......</span><br><span class="line">        </span><br><span class="line">        // 如果选举出的Master节点是当前节点</span><br><span class="line">        if (transportService.getLocalNode().equals(masterNode)) &#123;</span><br><span class="line">           ......</span><br><span class="line">           </span><br><span class="line">        &#125; else &#123; // 选举出的Master节点不是当前节点</span><br><span class="line">            // 停止其他节点的join请求</span><br><span class="line">            nodeJoinController.stopElectionContext(masterNode + &quot; elected&quot;);</span><br><span class="line"></span><br><span class="line">            // 因为当前节点不是当选的临时master节点,临时Master节点当做最终的Master节点，向Master节点发出join请求</span><br><span class="line">            final boolean success = joinElectedMaster(masterNode);</span><br><span class="line"></span><br><span class="line">            synchronized (stateMutex) &#123;</span><br><span class="line">                if (success) &#123;// 如果成功</span><br><span class="line">                    // 从集群中获取Master节点</span><br><span class="line">                    DiscoveryNode currentMasterNode = this.clusterState().getNodes().getMasterNode();</span><br><span class="line">                    if (currentMasterNode == null) &#123;</span><br><span class="line">                        // 如果master为空，重新选举</span><br><span class="line">                        logger.debug(&quot;no master node is set, despite of join request completing. retrying pings.&quot;);</span><br><span class="line">                        joinThreadControl.markThreadAsDoneAndStartNew(currentThread);</span><br><span class="line">                    &#125; else if (currentMasterNode.equals(masterNode) == false) &#123; //如果当选的master节点不是之前选出的临时Master节点</span><br><span class="line">                        </span><br><span class="line">                        // 停止当前线程并且重新join joinThreadControl.stopRunningThreadAndRejoin(&quot;master_switched_while_finalizing_join&quot;);</span><br><span class="line">                    &#125;</span><br><span class="line">                    //选举</span><br><span class="line">                    joinThreadControl.markThreadAsDone(currentThread);</span><br><span class="line">                &#125; else &#123;</span><br><span class="line">                    // 如果请求失败，重新发出join请求</span><br><span class="line">                    joinThreadControl.markThreadAsDoneAndStartNew(currentThread);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p> <strong>投票与得票的实现</strong></p>
+<p>在确定Master节点的时候，如果推选的临时Master为当前节点，有一步是调用waitToBeElectedAsMaster方法，等待当前节点被推举为真正的Master节点，借助waitToBeElectedAsMaster方法看一下投票与得票的实现。</p>
+<p><strong>NodeJoinController</strong></p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">NodeJoinController</span> <span class="keyword">extends</span> <span class="title">AbstractComponent</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">   <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">waitToBeElectedAsMaster</span><span class="params">(<span class="keyword">int</span> requiredMasterJoins, TimeValue timeValue, <span class="keyword">final</span> ElectionCallback callback)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 创建一个计数器</span></span><br><span class="line">        <span class="keyword">final</span> CountDownLatch done = <span class="keyword">new</span> CountDownLatch(<span class="number">1</span>);</span><br><span class="line">        <span class="comment">// 创建回调函数</span></span><br><span class="line">        <span class="keyword">final</span> ElectionCallback wrapperCallback = <span class="keyword">new</span> ElectionCallback() &#123;</span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onElectedAsMaster</span><span class="params">(ClusterState state)</span> </span>&#123;</span><br><span class="line">                <span class="comment">// 选举成功，计数器减1</span></span><br><span class="line">                done.countDown();</span><br><span class="line">                callback.onElectedAsMaster(state);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">onFailure</span><span class="params">(Throwable t)</span> </span>&#123;</span><br><span class="line">                <span class="comment">// 如果选举失败，计数器减1</span></span><br><span class="line">                done.countDown();</span><br><span class="line">                callback.onFailure(t);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        ElectionContext myElectionContext = <span class="keyword">null</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            <span class="keyword">synchronized</span> (<span class="keyword">this</span>) &#123;</span><br><span class="line">                <span class="comment">// 判断ElectionContext是否为空</span></span><br><span class="line">                <span class="keyword">assert</span> electionContext != <span class="keyword">null</span> : <span class="string">"waitToBeElectedAsMaster is called we are not accumulating joins"</span>;</span><br><span class="line">                myElectionContext = electionContext;</span><br><span class="line">                <span class="comment">// 设置回调函数和法定人数，为选举做准备</span></span><br><span class="line">                electionContext.onAttemptToBeElected(requiredMasterJoins, wrapperCallback);</span><br><span class="line">                <span class="comment">// 这里判断是否到达法定人数，如果达到，被选为Master</span></span><br><span class="line">                checkPendingJoinsAndElectIfNeeded();</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="comment">// 选主成功或失败都会将计数器减1，这里等待选举结束（设置了超时时间，如果在这段时间内选举还没有结束，放弃等待）</span></span><br><span class="line">                <span class="keyword">if</span> (done.await(timeValue.millis(), TimeUnit.MILLISECONDS)) &#123;</span><br><span class="line">                    <span class="comment">// callback handles everything</span></span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125; <span class="keyword">catch</span> (InterruptedException e) &#123;</span><br><span class="line"></span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">                <span class="comment">// 再次收集投票数量</span></span><br><span class="line">                <span class="keyword">final</span> <span class="keyword">int</span> pendingNodes = myElectionContext.getPendingMasterJoinsCount();</span><br><span class="line">                logger.trace(<span class="string">"timed out waiting to be elected. waited [&#123;&#125;]. pending master node joins [&#123;&#125;]"</span>, timeValue, pendingNodes);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 停止选举</span></span><br><span class="line">            failContextIfNeeded(myElectionContext, <span class="string">"timed out waiting to be elected"</span>);</span><br><span class="line">        &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">            logger.error(<span class="string">"unexpected failure while waiting for incoming joins"</span>, e);</span><br><span class="line">            <span class="keyword">if</span> (myElectionContext != <span class="keyword">null</span>) &#123;</span><br><span class="line">                failContextIfNeeded(myElectionContext, <span class="string">"unexpected failure while waiting for pending joins ["</span> + e.getMessage() + <span class="string">"]"</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 检查发送请求的数量（投票数）是否达到成为Master的条件</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title">checkPendingJoinsAndElectIfNeeded</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">assert</span> electionContext != <span class="keyword">null</span> : <span class="string">"election check requested but no active context"</span>;</span><br><span class="line">        <span class="comment">// 获取投票数</span></span><br><span class="line">        <span class="keyword">final</span> <span class="keyword">int</span> pendingMasterJoins = electionContext.getPendingMasterJoinsCount();</span><br><span class="line">        <span class="comment">// 判断投票数是否达到法定人数</span></span><br><span class="line">        <span class="keyword">if</span> (electionContext.isEnoughPendingJoins(pendingMasterJoins) == <span class="keyword">false</span>) &#123;</span><br><span class="line">            <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">                logger.trace(<span class="string">"not enough joins for election. Got [&#123;&#125;], required [&#123;&#125;]"</span>, pendingMasterJoins,</span><br><span class="line">                    electionContext.requiredMasterJoins);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;<span class="comment">// 如果达到了法定人数</span></span><br><span class="line">            <span class="keyword">if</span> (logger.isTraceEnabled()) &#123;</span><br><span class="line">                logger.trace(<span class="string">"have enough joins for election. Got [&#123;&#125;], required [&#123;&#125;]"</span>, pendingMasterJoins,</span><br><span class="line">                    electionContext.requiredMasterJoins);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 成为Master节点</span></span><br><span class="line">            electionContext.closeAndBecomeMaster();</span><br><span class="line">            electionContext = <span class="keyword">null</span>; <span class="comment">// clear this out so future joins won't be accumulated</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 选举为Master</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">synchronized</span> <span class="keyword">void</span> <span class="title">closeAndBecomeMaster</span><span class="params">()</span> </span>&#123;</span><br><span class="line">            <span class="keyword">assert</span> callback != <span class="keyword">null</span> : <span class="string">"becoming a master but the callback is not yet set"</span>;</span><br><span class="line">            <span class="function"><span class="keyword">assert</span> <span class="title">isEnoughPendingJoins</span><span class="params">(getPendingMasterJoinsCount()</span>) : "becoming a master but pending joins of "</span></span><br><span class="line"><span class="function">                + <span class="title">getPendingMasterJoinsCount</span><span class="params">()</span> + " are not enough. needs [" + requiredMasterJoins + "]</span>;<span class="string">";</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">            innerClose();</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">            Map&lt;DiscoveryNode, ClusterStateTaskListener&gt; tasks = getPendingAsTasks();</span></span><br><span class="line"><span class="string">            final String source = "</span>zen-disco-elected-as-master ([<span class="string">" + tasks.size() + "</span>] nodes joined)<span class="string">";</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">            tasks.put(BECOME_MASTER_TASK, (source1, e) -&gt; &#123;&#125;); // noop listener, the election finished listener determines result</span></span><br><span class="line"><span class="string">            tasks.put(FINISH_ELECTION_TASK, electionFinishedListener);</span></span><br><span class="line"><span class="string">            // 这里更新cluster state version</span></span><br><span class="line"><span class="string">            masterService.submitStateUpdateTasks(source, tasks, ClusterStateTaskConfig.build(Priority.URGENT), joinTaskExecutor);</span></span><br><span class="line"><span class="string">        &#125;</span></span><br><span class="line"><span class="string">        </span></span><br><span class="line"><span class="string">    // 是否达到法定人数</span></span><br><span class="line"><span class="string">    public synchronized boolean isEnoughPendingJoins(int pendingMasterJoins) &#123;</span></span><br><span class="line"><span class="string">            final boolean hasEnough;</span></span><br><span class="line"><span class="string">            // 如果法定人数小于0</span></span><br><span class="line"><span class="string">            if (requiredMasterJoins &lt; 0) &#123;</span></span><br><span class="line"><span class="string">                hasEnough = false;</span></span><br><span class="line"><span class="string">            &#125; else &#123;</span></span><br><span class="line"><span class="string">                assert callback != null : "</span>requiredMasterJoins is set but not the callback<span class="string">";</span></span><br><span class="line"><span class="string">                // 判断投票数是否达到法定人数</span></span><br><span class="line"><span class="string">                hasEnough = pendingMasterJoins &gt;= requiredMasterJoins;</span></span><br><span class="line"><span class="string">            &#125;</span></span><br><span class="line"><span class="string">            return hasEnough;</span></span><br><span class="line"><span class="string">        &#125;</span></span><br><span class="line"><span class="string">    </span></span><br><span class="line"><span class="string">    class ElectionContext &#123;</span></span><br><span class="line"><span class="string">        private ElectionCallback callback = null;</span></span><br><span class="line"><span class="string">        private int requiredMasterJoins = -1;</span></span><br><span class="line"><span class="string">        private final Map&lt;DiscoveryNode, List&lt;MembershipAction.JoinCallback&gt;&gt; joinRequestAccumulator = new HashMap&lt;&gt;();</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">        final AtomicBoolean closed = new AtomicBoolean();</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">        public synchronized void onAttemptToBeElected(int requiredMasterJoins, ElectionCallback callback) &#123;</span></span><br><span class="line"><span class="string">            ensureOpen();</span></span><br><span class="line"><span class="string">            assert this.requiredMasterJoins &lt; 0;</span></span><br><span class="line"><span class="string">            assert this.callback == null;</span></span><br><span class="line"><span class="string">            this.requiredMasterJoins = requiredMasterJoins;</span></span><br><span class="line"><span class="string">            this.callback = callback;</span></span><br><span class="line"><span class="string">        &#125;</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">       ......</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">        // 获取投票数</span></span><br><span class="line"><span class="string">        public synchronized int getPendingMasterJoinsCount() &#123;</span></span><br><span class="line"><span class="string">            int pendingMasterJoins = 0;</span></span><br><span class="line"><span class="string">            // 节点收到的join连接被存储在joinRequestAccumulator，遍历joinRequestAccumulator.</span></span><br><span class="line"><span class="string">            for (DiscoveryNode node : joinRequestAccumulator.keySet()) &#123;</span></span><br><span class="line"><span class="string">                // 如果发送请求的节点具有master节点资格</span></span><br><span class="line"><span class="string">                if (node.isMasterNode()) &#123;</span></span><br><span class="line"><span class="string">                    // 投票数+1</span></span><br><span class="line"><span class="string">                    pendingMasterJoins++;</span></span><br><span class="line"><span class="string">                &#125;</span></span><br><span class="line"><span class="string">            &#125;</span></span><br><span class="line"><span class="string">            return pendingMasterJoins;</span></span><br><span class="line"><span class="string">        &#125;</span></span><br><span class="line"><span class="string">        </span></span><br><span class="line"><span class="string">        ......</span></span><br><span class="line"><span class="string">    &#125;</span></span><br><span class="line"><span class="string">&#125;</span></span><br></pre></td></tr></table></figure>
+<p><strong>参考：</strong></p>
+<p>Elasticsearch源码解析与优化实战【张超】</p>
+<p><a href="https://zhuanlan.zhihu.com/p/34858035" target="_blank" rel="noopener">Elasticsearch分布式一致性原理剖析(一)-节点篇</a></p>
+<p><strong>Elasticsearch版本:6.1.2</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2019/01/31/Elasticsearch：GET流程/" rel="next" title="Elasticsearch：GET流程">
+                <i class="fa fa-chevron-left"></i> Elasticsearch：GET流程
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">14</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">2</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#Master选举算法"><span class="nav-number">1.</span> <span class="nav-text">Master选举算法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Elasticsearch-Master选举流程"><span class="nav-number">2.</span> <span class="nav-text">Elasticsearch Master选举流程</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#1-Ping所有的节点，选举临时的Master"><span class="nav-number">2.1.</span> <span class="nav-text">1.Ping所有的节点，选举临时的Master</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#具体选举过程"><span class="nav-number">2.1.1.</span> <span class="nav-text">具体选举过程</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#2-确立Master"><span class="nav-number">2.2.</span> <span class="nav-text">2.确立Master</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2019</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
