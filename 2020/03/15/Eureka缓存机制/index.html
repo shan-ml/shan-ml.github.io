@@ -88,7 +88,7 @@
 <meta property="og:locale" content="default">
 <meta property="og:image" content="http://yoursite.com/images/cache.png">
 <meta property="og:image" content="http://yoursite.com/images/fetchregistry.png">
-<meta property="og:updated_time" content="2020-03-15T06:27:43.024Z">
+<meta property="og:updated_time" content="2020-03-15T12:25:33.988Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Eureka缓存机制">
 <meta name="twitter:description" content="Eureka分为Client端和Server端，Client端向Server端注册自己的服务信息，并且拉取所有服务的注册信息，Server端作为注册中心，负责接收Client端的注册信息，维护所有服务的注册信息，Server端也可以开启集群模式，相互之间同步服务的注册信息。 与缓存相关的三个变量 1.registry1private final ConcurrentHashMap&amp;lt;Strin">
@@ -304,13 +304,13 @@
       
         <p>Eureka分为Client端和Server端，Client端向Server端注册自己的服务信息，并且拉取所有服务的注册信息，Server端作为注册中心，负责接收Client端的注册信息，维护所有服务的注册信息，Server端也可以开启集群模式，相互之间同步服务的注册信息。</p>
 <p><strong>与缓存相关的三个变量</strong></p>
-<h5 id="1-registry"><a href="#1-registry" class="headerlink" title="1.registry"></a>1.registry</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">final</span> ConcurrentHashMap&lt;String, Map&lt;String, Lease&lt;InstanceInfo&gt;&gt;&gt; register</span><br></pre></td></tr></table></figure>
+<h5 id="1-registry"><a href="#1-registry" class="headerlink" title="1.registry"></a>1.registry</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">final</span> ConcurrentHashMap&lt;String, Map&lt;String, Lease&lt;InstanceInfo&gt;&gt;&gt; registry</span><br></pre></td></tr></table></figure>
 <p>AbstractInstanceRegistry的成员变量，相当于服务端的注册表，维护所有服务的注册信息，第一层Map的key是服务的应用名称，value也是一个map,其中key是实例id,value是实例的详细信息(Lease<instanceinfo>)。</instanceinfo></p>
 <h5 id="2-readWriteCacheMap"><a href="#2-readWriteCacheMap" class="headerlink" title="2.readWriteCacheMap"></a>2.readWriteCacheMap</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">final</span> LoadingCache&lt;Key, ResponseCacheImpl.Value&gt; readWriteCacheMap;</span><br></pre></td></tr></table></figure>
 <p>ResponseCacheImpl的成员变量,使用的是guava的LoadingCache构建的缓存，其中key为com.netflix.eureka.registry包下的Key对象，value是ResponseCacheImpl的内部类Value对象，从名称上可以看出它是一个读写缓存。</p>
 <h5 id="3-readOnlyCacheMap"><a href="#3-readOnlyCacheMap" class="headerlink" title="3.readOnlyCacheMap"></a>3.readOnlyCacheMap</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">final</span> ConcurrentMap&lt;Key, ResponseCacheImpl.Value&gt; readOnlyCacheMap = <span class="keyword">new</span> ConcurrentHashMap();</span><br></pre></td></tr></table></figure>
 <p>ResponseCacheImpl的成员变量，同样是一个ConcurrentMap，从名称上可以看出它是一个只读的缓存对象。</p>
-<p>所以Eureka Server使用了一个读写分离的两级缓存机制，register负责维护所有服务的注册信息，当register数据有变化，将会更新readWriteCacheMap的内容，后台开启一个定时任务，默认30s从readWriteCacheMap同步数据到readOnlyCacheMap，Eureka Client拉取服务的注册信息时，从readOnlyCacheMap读取数据，并没有直接从readWriteCacheMap中获取数据:</p>
+<p>所以Eureka Server使用了一个读写分离的两级缓存机制，registry负责维护所有服务的注册信息，当register数据有变化，将会更新readWriteCacheMap的内容，后台开启定时任务，默认30s从readWriteCacheMap同步数据到readOnlyCacheMap，Eureka Client拉取服务的注册信息时，从readOnlyCacheMap读取数据，并没有直接从readWriteCacheMap中获取数据:</p>
 <p><img src="/images/cache.png" alt=""> </p>
 <p>Client从Server端拉取数据流程：</p>
 <p>（1）Client端DiscoveryClient的构造函数中，会初始化定时任务；</p>
@@ -368,7 +368,7 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2020/02/09/MySQL：更新语句执行流程/" rel="next" title="MySQL：更新语句执行流程">
+              <a href="/2020/02/09/MySQL-更新语句执行流程/" rel="next" title="MySQL：更新语句执行流程">
                 <i class="fa fa-chevron-left"></i> MySQL：更新语句执行流程
               </a>
             
@@ -377,6 +377,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2020/05/03/MySQL-MVVC机制/" rel="prev" title="MySQL-MVCC机制">
+                MySQL-MVCC机制 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -453,7 +457,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">17</span>
+                  <span class="site-state-item-count">18</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
