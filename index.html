@@ -316,8 +316,7 @@
 <p>（4）重复步骤2和3，直到找到不满足条件的city为止；</p>
 <p>（5）对sort_buffer中的数据按照name字段做排序；</p>
 <p>（6）按照排序结果取前1000行返回给客户端；</p>
-<p><strong>rowid排序</strong></p>
-<p>在全字段排序中，假如select中取的字段太多，sort_buffer可能放不下，就需要借助外部排序，排序的性能会下降，max_length_for_sort_data参数可以修改排序的单行最大长度，在全字段排序中取了city、name和age字段，三个字段的数据类型长度加起来就是排序的单行长度，假设全排序中单行长度超过了max_length_for_sort_data，MySQL为了提高性能，会采用rowid排序。</p>
+<h4 id="rowid排序"><a href="#rowid排序" class="headerlink" title="rowid排序"></a>rowid排序</h4><p>在全字段排序中，假如select中取的字段太多，sort_buffer可能放不下，就需要借助外部排序，排序的性能会下降，max_length_for_sort_data参数可以修改排序的单行最大长度，在全字段排序中取了city、name和age字段，三个字段的数据类型长度加起来就是排序的单行长度，假设全排序中单行长度超过了max_length_for_sort_data，MySQL为了提高性能，会采用rowid排序。</p>
 <p><strong>rowid的排序流程：</strong></p>
 <p>（1）初始化sort_buffer，放入name（因为需要根据name进行排序）和id；</p>
 <p>（2）从city索引中找到第一个city为杭州的数据的id，到主键索引中找到对应的记录，取name和id两个字段的值，放入sort_buffer；</p>
@@ -325,13 +324,18 @@
 <p>（4）重复步骤2和3，知道找到不满足的条件的city为止；</p>
 <p>（5）对sort_buffer中的数据按照name排序；</p>
 <p>（6）根据排序的结果取前1000行，因为sort_buffer中只放了name和id，没有age和city，所以此时需要根据id再次从主键所以中回表取出city 、name和age的值，最后返回给客户端；</p>
-<p><img src="/images/rowid.jpg" alt=""><br>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</p>
+<p><img src="/images/rowid.jpg" alt=""> </p>
+<center>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</center>
+
 <p>可以发现与字段全排序相比，rowid比字段全排序多了一次最后根据id从主键索引回表的过程。</p>
 <p><strong>总结：</strong></p>
 <p>1.如果sort_buffer足够大，会优先选择字段全排序，把需要的字段全放入sort_buffer中，排序后可直接返回结果；</p>
 <p>2.如果sort_buffer无法满足排序的数量，会采用rowid排序算法，但是需要根据id回表查询所需的字段；</p>
-<p><strong>优化：</strong><br>如果根据索引取到的数据就是有序的，那么就可以省去排序的过程了，所以可以在表上建一个city和name的联合索引，此时的查询流程如下：</p>
-<p><img src="/images/cityname.png" alt=""><br>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</p>
+<p><strong>优化：</strong></p>
+<p>如果根据索引取到的数据就是有序的，那么就可以省去排序的过程了，所以可以在表上建一个city和name的联合索引，此时的查询流程如下：</p>
+<p><img src="/images/cityname.png" alt=""> </p>
+<center>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</center>
+
 <p>（1）从联合索引(city,name)中找到第一个满足city是杭州的数据的主键id;</p>
 <p>（2）到主键索引中根据主键id取name、city、age三个字段的值，返回结果到客户端；</p>
 <p>（3）继续取下一个记录的id；</p>
@@ -342,7 +346,7 @@
 <p>（3）重复执行步骤2，直到第1000条记录或者不满足条件为止；</p>
 <h3 id="join-buffer"><a href="#join-buffer" class="headerlink" title="join buffer"></a>join buffer</h3><h4 id="Index-Nested-Loop-Join（NLJ）"><a href="#Index-Nested-Loop-Join（NLJ）" class="headerlink" title="Index Nested-Loop Join（NLJ）"></a>Index Nested-Loop Join（NLJ）</h4><p>假设有两张表t1和t2，表结构一致，除了主键id之外只有两个字段a和b，在a字段上创建索引，然后执行语句：</p>
 <p><img src="/images/table.png" alt=""> </p>
-<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">select * from t1 straight_join t2 on (t1.a=t2.a);</span><br></pre></td></tr></table></figure>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> t1 <span class="keyword">straight_join</span> t2 <span class="keyword">on</span> (t1.a=t2.a);</span><br></pre></td></tr></table></figure>
 <p>执行流程：</p>
 <p>（1）从表t1读入一行数据R；</p>
 <p>（2）从数据行R中读取a字段的值，到表t2中查找，由于t2表中a字段创建了索引，所以可以借助索引在表t2中查找；</p>
@@ -350,7 +354,7 @@
 <p>（4）重复执行步骤1到3，遍历表t1，直到所有数据被读完；</p>
 <p>在这个过程中，t1属于驱动表，t2属于被驱动表，驱动表t1做了全表扫描，每次取出一行，然后取出字段a的值再从t2中借助索引进行查找，完成表数据行的关联，由于在被驱动表中查找时使用到了索引，所以这种查询流程称为Index Nested-Loop Join。</p>
 <h4 id="Simple-Nested-Loop-Join"><a href="#Simple-Nested-Loop-Join" class="headerlink" title="Simple Nested-Loop Join"></a>Simple Nested-Loop Join</h4><p>修改一下查询语句，假如执行下面这个查询：</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> t1 <span class="keyword">straight_join</span> t2 <span class="keyword">on</span> (t1.a=t2.b);</span><br></pre></td></tr></table></figure>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> t1 <span class="keyword">straight_join</span> t2 <span class="keyword">on</span> (t1.a=t2.b);</span><br></pre></td></tr></table></figure>
 <p>表t2的字段b是没有索引的，所以此时的查询流程如下：</p>
 <p>（1）从表t1读入一行数据R；</p>
 <p>（2）从数据行R中读取a字段的值，到表t2中查找，由于t2表中b字段没有索引，所以只能对t2进行全表扫描，查找满足条件的值；</p>
@@ -360,7 +364,9 @@
 <h4 id="Block-Nested-Loop-Join（BNL）"><a href="#Block-Nested-Loop-Join（BNL）" class="headerlink" title="Block Nested-Loop Join（BNL）"></a>Block Nested-Loop Join（BNL）</h4><p>在被驱动表上没有可用的索引时，BNL算法的执行流程：</p>
 <p>（1）将表t1的数据放入线程内存join_buffer中，由于语句是select * 所以t1的所有数据会被加载到join_buffer中；</p>
 <p>（2）扫描表t2，取出表t2的每一行，与join_buffer中的数据做对比，如果满足条件，将数据关联，作为结果集的一部分返回；</p>
-<p><img src="/images/bnl.jpg" alt=""><br>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</p>
+<p><img src="/images/bnl.jpg" alt=""> </p>
+<center>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</center>
+
 <p>假设表t1的行数为N，t2的行数为M：</p>
 <ul>
 <li>两张表都做了一次全表扫描，扫描行数是M+N；</li>
@@ -371,7 +377,7 @@
 <p>（2）扫描表t2，取出表t2的每一行，与join_buffer中的数据做对比，如果满足条件，将数据关联，作为结果集的一部分返回；</p>
 <p>（3）清空join_buffer；</p>
 <p>（4）继续扫描t1，将剩余的行放入join_buffer，重复步骤1、2、3；</p>
-<p>总结：</p>
+<p><strong>总结：</strong></p>
 <p>（1）尽量使用小表做驱动表；</p>
 <p>（2）使用BNL算法在大表上的join操作可能要扫描被驱动表多次，占用大量的系统资源，尽量避免这种join；</p>
 <p><strong>参考</strong></p>
