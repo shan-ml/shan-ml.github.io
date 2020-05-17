@@ -379,7 +379,25 @@
 <p>（4）继续扫描t1，将剩余的行放入join_buffer，重复步骤1、2、3；</p>
 <p><strong>总结：</strong></p>
 <p>（1）尽量使用小表做驱动表；</p>
-<p>（2）使用BNL算法在大表上的join操作可能要扫描被驱动表多次，占用大量的系统资源，尽量避免这种join；</p>
+<p>（2）使用BNL算法在大表上的join操作可能要扫描被驱动表多次，占用大量的IO资源，在判断join条件时可能需要大量的判断占用CPU资源，尽量避免这种join；</p>
+<p>（3）会导致Buffer Pool的热数据被淘汰，影响内存命中率；</p>
+<h4 id="Multi-Range-Read-优化"><a href="#Multi-Range-Read-优化" class="headerlink" title="Multi-Range Read 优化"></a>Multi-Range Read 优化</h4><p>我们知道，MySQL InnoDB的二级索引叶子节点中存储的是主键的值，如果需要查询其他字段的值，需要根据主键的值去主键索引上查找，才能拿到其他字段的值，这个操作称为回表，假设有一表t，在字段a上创建了索引，执行如下语句：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> t1 <span class="keyword">where</span> a&gt;=<span class="number">1</span> <span class="keyword">and</span> a&lt;=<span class="number">100</span>;</span><br></pre></td></tr></table></figure>
+<p>执行流程：</p>
+<p>（1）在字段a上建立的二级索引中找到第一个a值大于1的节点，找到对应的主键；</p>
+<p>（2）根据主键值去主键索引中查找，获取该行记录所有字段的值，作为返回结果集；</p>
+<p>（3）循环步骤1和2，直到把小于等于100的值全部寻找完毕；</p>
+<blockquote>
+<p>在这个过程中，由于每次只根据一个主键ID去主键索引中查找，每次查找就变成了随机访问，性能相对较差，因为大部分数据都是按照主键递增顺序插入得到的，假如按照主键递增顺序查找的话，对磁盘的读比较接近顺序读，这样就可以提升读性能，这就是MRR优化的思路。</p>
+</blockquote>
+<p>MRR优化后的执行流程：</p>
+<p>（1）根据a字段上的二级索引找到所有满足条件的记录，将所有的主键ID值放入read_rnd_buffer中；</p>
+<p>（2）将read_rnd_buffer中的id进行递增排序；</p>
+<p>（3）根据read_rnd_buffer中排好序的id依次到主键索引中查询记录，并作为返回结果；</p>
+<p><strong>MRR的核心思想在于得到足够多的主键ID，然后对ID排序，再去主键索引查找数据，将随机访问改为尽量接近顺序访问。</strong></p>
+<h4 id="Batched-Key-Access优化"><a href="#Batched-Key-Access优化" class="headerlink" title="Batched Key Access优化"></a>Batched Key Access优化</h4><p>MySQL在5.6版本之后引入了Batched Key Access(BKA) 算法，它可以对 Index Nested-Loop Join（NLJ） 进行优化。</p>
+<p>NLJ算法的流程是从驱动表t1，一行一行的取出a值，再到被驱动表t2中根据字段a的索引去查找，对于表t2每次只匹配一个值，为了让t2表可以一次性多拿到一些值，可以把t1表的数据取出来之后先放到临时内存中，然后批量的去t2表的索引上去查询，我们知道在NLJ算法中并没有用到join_buffer，所以join_buffer就可以充当临时内存。</p>
+<p><strong>BKA算法的核心思想就是借助join_buffer批量的从被驱动表的索引中查询数据。</strong></p>
 <p><strong>参考</strong></p>
 <p>极客时间 — 林晓斌（丁奇）：MySQL实战</p>
 
