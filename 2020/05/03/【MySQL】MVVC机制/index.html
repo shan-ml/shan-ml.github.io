@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT" />
+  <meta name="keywords" content="mysql," />
 
 
 
@@ -80,9 +80,10 @@
 
 
 <meta name="description" content="MySQL隔离级别读未提交(Read Uncommitted)：某个事务读到了其他还未提交的事务对数据所作的修改，也就是某个事务只要修改了数据，其他事务就可以看到所作的修改。  这种隔离级别下会发生脏读、不可重复读、幻读。  读提交(Read Committed)：某个事务提交之后，才可以被其他事务看到。  这种隔离级别下会发生不可重复读、幻读。  可重复读(Repeatable Read)：一个">
+<meta name="keywords" content="mysql">
 <meta property="og:type" content="article">
-<meta property="og:title" content="MySQL-MVCC机制">
-<meta property="og:url" content="http://yoursite.com/2020/05/03/MySQL-MVVC机制/index.html">
+<meta property="og:title" content="【MySQL】MVVC机制">
+<meta property="og:url" content="http://yoursite.com/2020/05/03/【MySQL】MVVC机制/index.html">
 <meta property="og:site_name" content="SHAN">
 <meta property="og:description" content="MySQL隔离级别读未提交(Read Uncommitted)：某个事务读到了其他还未提交的事务对数据所作的修改，也就是某个事务只要修改了数据，其他事务就可以看到所作的修改。  这种隔离级别下会发生脏读、不可重复读、幻读。  读提交(Read Committed)：某个事务提交之后，才可以被其他事务看到。  这种隔离级别下会发生不可重复读、幻读。  可重复读(Repeatable Read)：一个">
 <meta property="og:locale" content="default">
@@ -91,9 +92,9 @@
 <meta property="og:image" content="http://yoursite.com/images/readview.png">
 <meta property="og:image" content="http://yoursite.com/images/rc.png">
 <meta property="og:image" content="http://yoursite.com/images/rr.png">
-<meta property="og:updated_time" content="2020-05-03T03:58:53.135Z">
+<meta property="og:updated_time" content="2021-03-21T03:06:14.012Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="MySQL-MVCC机制">
+<meta name="twitter:title" content="【MySQL】MVVC机制">
 <meta name="twitter:description" content="MySQL隔离级别读未提交(Read Uncommitted)：某个事务读到了其他还未提交的事务对数据所作的修改，也就是某个事务只要修改了数据，其他事务就可以看到所作的修改。  这种隔离级别下会发生脏读、不可重复读、幻读。  读提交(Read Committed)：某个事务提交之后，才可以被其他事务看到。  这种隔离级别下会发生不可重复读、幻读。  可重复读(Repeatable Read)：一个">
 <meta name="twitter:image" content="http://yoursite.com/images/trx_version.png">
 
@@ -125,13 +126,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2020/05/03/MySQL-MVVC机制/"/>
+  <link rel="canonical" href="http://yoursite.com/2020/05/03/【MySQL】MVVC机制/"/>
 
 
 
 
 
-  <title>MySQL-MVCC机制 | SHAN</title>
+  <title>【MySQL】MVVC机制 | SHAN</title>
   
 
 
@@ -238,7 +239,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/03/MySQL-MVVC机制/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/03/【MySQL】MVVC机制/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="shan">
@@ -255,7 +256,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">MySQL-MVCC机制</h1>
+          <h1 class="post-title" itemprop="name headline">【MySQL】MVVC机制</h1>
         
 
         <div class="post-meta">
@@ -396,6 +397,12 @@
 
     <footer class="post-footer">
       
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+        </div>
+      
 
       
       
@@ -415,8 +422,8 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2020/05/16/MySQL-sort buffer和join buffer/" rel="prev" title="MySQL：sort buffer和join buffer">
-                MySQL：sort buffer和join buffer <i class="fa fa-chevron-right"></i>
+              <a href="/2020/05/16/【MySQL】sort buffer和join buffer/" rel="prev" title="【MySQL】sort buffer和join buffer">
+                【MySQL】sort buffer和join buffer <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -507,7 +514,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">5</span>
+                  <span class="site-state-item-count">7</span>
                   <span class="site-state-item-name">tags</span>
                 
               </div>

@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT" />
+  <meta name="keywords" content="mysql," />
 
 
 
@@ -80,9 +80,10 @@
 
 
 <meta name="description" content="buffer pool  buffer pool缓冲池，用来缓存数据页，避免每次都从磁盘上加载数据，由于buffer pool是基于内存的，所以查询速度非常快。  undo log  undo log回滚日志，记录了SQL执行之前的旧值，用来做数据回滚。  redo log  redo log重做日志，是InnoDB存储引擎的日志，记录的是数据页的物理修改，在某个数据页上做了什么修改，用来恢复数据">
+<meta name="keywords" content="mysql">
 <meta property="og:type" content="article">
-<meta property="og:title" content="MySQL：更新语句执行流程">
-<meta property="og:url" content="http://yoursite.com/2020/02/09/MySQL-更新语句执行流程/index.html">
+<meta property="og:title" content="【MySQL】更新语句执行流程">
+<meta property="og:url" content="http://yoursite.com/2020/02/09/【MySQL】更新语句执行流程/index.html">
 <meta property="og:site_name" content="SHAN">
 <meta property="og:description" content="buffer pool  buffer pool缓冲池，用来缓存数据页，避免每次都从磁盘上加载数据，由于buffer pool是基于内存的，所以查询速度非常快。  undo log  undo log回滚日志，记录了SQL执行之前的旧值，用来做数据回滚。  redo log  redo log重做日志，是InnoDB存储引擎的日志，记录的是数据页的物理修改，在某个数据页上做了什么修改，用来恢复数据">
 <meta property="og:locale" content="default">
@@ -90,9 +91,9 @@
 <meta property="og:image" content="http://yoursite.com/images/redolog_write.png">
 <meta property="og:image" content="http://yoursite.com/images/binlog_write.png">
 <meta property="og:image" content="http://yoursite.com/images/changebuffer.png">
-<meta property="og:updated_time" content="2020-05-02T15:43:46.677Z">
+<meta property="og:updated_time" content="2021-03-21T03:05:58.757Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="MySQL：更新语句执行流程">
+<meta name="twitter:title" content="【MySQL】更新语句执行流程">
 <meta name="twitter:description" content="buffer pool  buffer pool缓冲池，用来缓存数据页，避免每次都从磁盘上加载数据，由于buffer pool是基于内存的，所以查询速度非常快。  undo log  undo log回滚日志，记录了SQL执行之前的旧值，用来做数据回滚。  redo log  redo log重做日志，是InnoDB存储引擎的日志，记录的是数据页的物理修改，在某个数据页上做了什么修改，用来恢复数据">
 <meta name="twitter:image" content="http://yoursite.com/images/update_process.png">
 
@@ -124,13 +125,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2020/02/09/MySQL-更新语句执行流程/"/>
+  <link rel="canonical" href="http://yoursite.com/2020/02/09/【MySQL】更新语句执行流程/"/>
 
 
 
 
 
-  <title>MySQL：更新语句执行流程 | SHAN</title>
+  <title>【MySQL】更新语句执行流程 | SHAN</title>
   
 
 
@@ -237,7 +238,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/02/09/MySQL-更新语句执行流程/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/02/09/【MySQL】更新语句执行流程/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="shan">
@@ -254,7 +255,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">MySQL：更新语句执行流程</h1>
+          <h1 class="post-title" itemprop="name headline">【MySQL】更新语句执行流程</h1>
         
 
         <div class="post-meta">
@@ -379,6 +380,12 @@
 
     <footer class="post-footer">
       
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+        </div>
+      
 
       
       
@@ -490,7 +497,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">5</span>
+                  <span class="site-state-item-count">7</span>
                   <span class="site-state-item-name">tags</span>
                 
               </div>

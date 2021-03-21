@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT" />
+  <meta name="keywords" content="mysql," />
 
 
 
@@ -80,9 +80,10 @@
 
 
 <meta name="description" content="sort buffer和join buffer两者没什么关系，只是最近重读了极客时间的MySQL实战，又加深了对MySQL的认知，这里记录一下sort buffer和join buffer两个知识点，以便加深印象。 sort buffersort buffer从名字上就可以看出肯定和排序有关，MySQL会为每个线程分配一块内存，用于排序，这个内存就称为sort buffer。 内存的大小可以通过s">
+<meta name="keywords" content="mysql">
 <meta property="og:type" content="article">
-<meta property="og:title" content="MySQL：sort buffer和join buffer">
-<meta property="og:url" content="http://yoursite.com/2020/05/16/MySQL-sort buffer和join buffer/index.html">
+<meta property="og:title" content="【MySQL】sort buffer和join buffer">
+<meta property="og:url" content="http://yoursite.com/2020/05/16/【MySQL】sort buffer和join buffer/index.html">
 <meta property="og:site_name" content="SHAN">
 <meta property="og:description" content="sort buffer和join buffer两者没什么关系，只是最近重读了极客时间的MySQL实战，又加深了对MySQL的认知，这里记录一下sort buffer和join buffer两个知识点，以便加深印象。 sort buffersort buffer从名字上就可以看出肯定和排序有关，MySQL会为每个线程分配一块内存，用于排序，这个内存就称为sort buffer。 内存的大小可以通过s">
 <meta property="og:locale" content="default">
@@ -91,9 +92,9 @@
 <meta property="og:image" content="http://yoursite.com/images/cityname.png">
 <meta property="og:image" content="http://yoursite.com/images/table.png">
 <meta property="og:image" content="http://yoursite.com/images/bnl.jpg">
-<meta property="og:updated_time" content="2020-05-16T15:30:09.101Z">
+<meta property="og:updated_time" content="2021-03-21T03:06:27.852Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="MySQL：sort buffer和join buffer">
+<meta name="twitter:title" content="【MySQL】sort buffer和join buffer">
 <meta name="twitter:description" content="sort buffer和join buffer两者没什么关系，只是最近重读了极客时间的MySQL实战，又加深了对MySQL的认知，这里记录一下sort buffer和join buffer两个知识点，以便加深印象。 sort buffersort buffer从名字上就可以看出肯定和排序有关，MySQL会为每个线程分配一块内存，用于排序，这个内存就称为sort buffer。 内存的大小可以通过s">
 <meta name="twitter:image" content="http://yoursite.com/images/sort_buffer.png">
 
@@ -125,13 +126,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2020/05/16/MySQL-sort buffer和join buffer/"/>
+  <link rel="canonical" href="http://yoursite.com/2020/05/16/【MySQL】sort buffer和join buffer/"/>
 
 
 
 
 
-  <title>MySQL：sort buffer和join buffer | SHAN</title>
+  <title>【MySQL】sort buffer和join buffer | SHAN</title>
   
 
 
@@ -238,7 +239,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/16/MySQL-sort buffer和join buffer/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/16/【MySQL】sort buffer和join buffer/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="shan">
@@ -255,7 +256,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">MySQL：sort buffer和join buffer</h1>
+          <h1 class="post-title" itemprop="name headline">【MySQL】sort buffer和join buffer</h1>
         
 
         <div class="post-meta">
@@ -420,6 +421,12 @@
 
     <footer class="post-footer">
       
+        <div class="post-tags">
+          
+            <a href="/tags/mysql/" rel="tag"># mysql</a>
+          
+        </div>
+      
 
       
       
@@ -429,8 +436,8 @@
         <div class="post-nav">
           <div class="post-nav-next post-nav-item">
             
-              <a href="/2020/05/03/MySQL-MVVC机制/" rel="next" title="MySQL-MVCC机制">
-                <i class="fa fa-chevron-left"></i> MySQL-MVCC机制
+              <a href="/2020/05/03/【MySQL】MVVC机制/" rel="next" title="【MySQL】MVVC机制">
+                <i class="fa fa-chevron-left"></i> 【MySQL】MVVC机制
               </a>
             
           </div>
@@ -439,7 +446,7 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2021/01/10/SpringBoot自动装配原理/" rel="prev" title="SpringBoot自动装配原理">
+              <a href="/2021/01/10/【SpringBoot】自动装配原理/" rel="prev" title="SpringBoot自动装配原理">
                 SpringBoot自动装配原理 <i class="fa fa-chevron-right"></i>
               </a>
             
@@ -531,7 +538,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">5</span>
+                  <span class="site-state-item-count">7</span>
                   <span class="site-state-item-name">tags</span>
                 
               </div>

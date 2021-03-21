@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT" />
+  <meta name="keywords" content="Elasticsearch," />
 
 
 
@@ -80,16 +80,17 @@
 
 
 <meta name="description" content="Elasticsearch写入分为单个文档的写入和批量写入，单个文档的写入称作Index请求，批量写入称为Bulk请求，他们具有相同的处理逻辑，请求被统一封装为BuklRequest。   单个文档的写入流程： 1.客户端向Node1发送写入请求 2.Node1使用文档的id确定文档属于分片0,因为分片0的主分片不在当前节点，此时Node1充当协调节点，通过集群状态中的路由表可知分片0的主分片位于">
+<meta name="keywords" content="Elasticsearch">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Elasticsearch：写入流程">
-<meta property="og:url" content="http://yoursite.com/2019/01/30/Elasticsearch：写入流程/index.html">
+<meta property="og:title" content="【Elasticsearch】写入流程">
+<meta property="og:url" content="http://yoursite.com/2019/01/30/【Elasticsearch】写入流程/index.html">
 <meta property="og:site_name" content="SHAN">
 <meta property="og:description" content="Elasticsearch写入分为单个文档的写入和批量写入，单个文档的写入称作Index请求，批量写入称为Bulk请求，他们具有相同的处理逻辑，请求被统一封装为BuklRequest。   单个文档的写入流程： 1.客户端向Node1发送写入请求 2.Node1使用文档的id确定文档属于分片0,因为分片0的主分片不在当前节点，此时Node1充当协调节点，通过集群状态中的路由表可知分片0的主分片位于">
 <meta property="og:locale" content="default">
 <meta property="og:image" content="http://yoursite.com/images/es_index_1.png">
-<meta property="og:updated_time" content="2019-01-31T09:28:24.290Z">
+<meta property="og:updated_time" content="2021-03-21T03:04:45.237Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Elasticsearch：写入流程">
+<meta name="twitter:title" content="【Elasticsearch】写入流程">
 <meta name="twitter:description" content="Elasticsearch写入分为单个文档的写入和批量写入，单个文档的写入称作Index请求，批量写入称为Bulk请求，他们具有相同的处理逻辑，请求被统一封装为BuklRequest。   单个文档的写入流程： 1.客户端向Node1发送写入请求 2.Node1使用文档的id确定文档属于分片0,因为分片0的主分片不在当前节点，此时Node1充当协调节点，通过集群状态中的路由表可知分片0的主分片位于">
 <meta name="twitter:image" content="http://yoursite.com/images/es_index_1.png">
 
@@ -121,13 +122,13 @@
 
 
 
-  <link rel="canonical" href="http://yoursite.com/2019/01/30/Elasticsearch：写入流程/"/>
+  <link rel="canonical" href="http://yoursite.com/2019/01/30/【Elasticsearch】写入流程/"/>
 
 
 
 
 
-  <title>Elasticsearch：写入流程 | SHAN</title>
+  <title>【Elasticsearch】写入流程 | SHAN</title>
   
 
 
@@ -234,7 +235,7 @@
   
   
   <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/01/30/Elasticsearch：写入流程/">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2019/01/30/【Elasticsearch】写入流程/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="name" content="shan">
@@ -251,7 +252,7 @@
 
         
         
-          <h1 class="post-title" itemprop="name headline">Elasticsearch：写入流程</h1>
+          <h1 class="post-title" itemprop="name headline">【Elasticsearch】写入流程</h1>
         
 
         <div class="post-meta">
@@ -380,6 +381,12 @@
 
     <footer class="post-footer">
       
+        <div class="post-tags">
+          
+            <a href="/tags/Elasticsearch/" rel="tag"># Elasticsearch</a>
+          
+        </div>
+      
 
       
       
@@ -399,8 +406,8 @@
 
           <div class="post-nav-prev post-nav-item">
             
-              <a href="/2019/01/31/Elasticsearch：GET流程/" rel="prev" title="Elasticsearch：GET流程">
-                Elasticsearch：GET流程 <i class="fa fa-chevron-right"></i>
+              <a href="/2019/01/31/【Elasticsearch】GET流程/" rel="prev" title="【Elasticsearch】GET流程">
+                【Elasticsearch】GET流程 <i class="fa fa-chevron-right"></i>
               </a>
             
           </div>
@@ -491,7 +498,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">5</span>
+                  <span class="site-state-item-count">7</span>
                   <span class="site-state-item-name">tags</span>
                 
               </div>
