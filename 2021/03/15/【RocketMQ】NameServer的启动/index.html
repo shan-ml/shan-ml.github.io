@@ -68,7 +68,7 @@
 
 
 
-  <meta name="keywords" content="Hexo, NexT" />
+  <meta name="keywords" content="RocketMQ," />
 
 
 
@@ -80,16 +80,19 @@
 
 
 <meta name="description" content="NameServerNameServer是一个注册中心，支持Broker的注册与发现，Broker在启动的时候会向NameServer注册（服务注册），Producer和Consumer会通过NameServer拉取信息，获取Topic的路由信息（服务发现）。 NamesrvStartupNameServer的启动类是NamesrvStartup。 1.NameServer在启动的时候会创建一个N">
+<meta name="keywords" content="RocketMQ">
 <meta property="og:type" content="article">
 <meta property="og:title" content="NameServer的启动">
 <meta property="og:url" content="http://yoursite.com/2021/03/15/【RocketMQ】NameServer的启动/index.html">
 <meta property="og:site_name" content="SHAN">
 <meta property="og:description" content="NameServerNameServer是一个注册中心，支持Broker的注册与发现，Broker在启动的时候会向NameServer注册（服务注册），Producer和Consumer会通过NameServer拉取信息，获取Topic的路由信息（服务发现）。 NamesrvStartupNameServer的启动类是NamesrvStartup。 1.NameServer在启动的时候会创建一个N">
 <meta property="og:locale" content="default">
-<meta property="og:updated_time" content="2021-03-18T13:13:28.970Z">
+<meta property="og:image" content="http://yoursite.com/images/nameserver启动.jpg">
+<meta property="og:updated_time" content="2021-03-21T02:56:37.598Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="NameServer的启动">
 <meta name="twitter:description" content="NameServerNameServer是一个注册中心，支持Broker的注册与发现，Broker在启动的时候会向NameServer注册（服务注册），Producer和Consumer会通过NameServer拉取信息，获取Topic的路由信息（服务发现）。 NamesrvStartupNameServer的启动类是NamesrvStartup。 1.NameServer在启动的时候会创建一个N">
+<meta name="twitter:image" content="http://yoursite.com/images/nameserver启动.jpg">
 
 
 
@@ -316,6 +319,8 @@
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">NettyRemotingServer</span> <span class="keyword">extends</span> <span class="title">NettyRemotingAbstract</span> <span class="keyword">implements</span> <span class="title">RemotingServer</span> </span>&#123;</span><br><span class="line">        <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">start</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>.defaultEventExecutorGroup = <span class="keyword">new</span> DefaultEventExecutorGroup(</span><br><span class="line">            nettyServerConfig.getServerWorkerThreads(),</span><br><span class="line">            <span class="keyword">new</span> ThreadFactory() &#123;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">private</span> AtomicInteger threadIndex = <span class="keyword">new</span> AtomicInteger(<span class="number">0</span>);</span><br><span class="line"></span><br><span class="line">                <span class="meta">@Override</span></span><br><span class="line">                <span class="function"><span class="keyword">public</span> Thread <span class="title">newThread</span><span class="params">(Runnable r)</span> </span>&#123;</span><br><span class="line">                    <span class="keyword">return</span> <span class="keyword">new</span> Thread(r, <span class="string">"NettyServerCodecThread_"</span> + <span class="keyword">this</span>.threadIndex.incrementAndGet());</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;);</span><br><span class="line"></span><br><span class="line">        prepareSharableHandlers();</span><br><span class="line"></span><br><span class="line">        ServerBootstrap childHandler =</span><br><span class="line">            <span class="keyword">this</span>.serverBootstrap.group(<span class="keyword">this</span>.eventLoopGroupBoss, <span class="keyword">this</span>.eventLoopGroupSelector)</span><br><span class="line">                .channel(useEpoll() ? EpollServerSocketChannel.class : NioServerSocketChannel.class)</span><br><span class="line">                .option(ChannelOption.SO_BACKLOG, <span class="number">1024</span>)</span><br><span class="line">                .option(ChannelOption.SO_REUSEADDR, <span class="keyword">true</span>)</span><br><span class="line">                .option(ChannelOption.SO_KEEPALIVE, <span class="keyword">false</span>)</span><br><span class="line">                .childOption(ChannelOption.TCP_NODELAY, <span class="keyword">true</span>)</span><br><span class="line">                .childOption(ChannelOption.SO_SNDBUF, nettyServerConfig.getServerSocketSndBufSize())</span><br><span class="line">                .childOption(ChannelOption.SO_RCVBUF, nettyServerConfig.getServerSocketRcvBufSize())</span><br><span class="line">                .localAddress(<span class="keyword">new</span> InetSocketAddress(<span class="keyword">this</span>.nettyServerConfig.getListenPort()))</span><br><span class="line">                .childHandler(<span class="keyword">new</span> ChannelInitializer&lt;SocketChannel&gt;() &#123;</span><br><span class="line">                    <span class="meta">@Override</span></span><br><span class="line">                    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">initChannel</span><span class="params">(SocketChannel ch)</span> <span class="keyword">throws</span> Exception </span>&#123;</span><br><span class="line">                        ch.pipeline()</span><br><span class="line">                            .addLast(defaultEventExecutorGroup, HANDSHAKE_HANDLER_NAME, handshakeHandler)</span><br><span class="line">                            .addLast(defaultEventExecutorGroup,</span><br><span class="line">                                encoder,</span><br><span class="line">                                <span class="keyword">new</span> NettyDecoder(),</span><br><span class="line">                                <span class="keyword">new</span> IdleStateHandler(<span class="number">0</span>, <span class="number">0</span>, nettyServerConfig.getServerChannelMaxIdleTimeSeconds()),</span><br><span class="line">                                connectionManageHandler,</span><br><span class="line">                                serverHandler</span><br><span class="line">                            );</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (nettyServerConfig.isServerPooledByteBufAllocatorEnable()) &#123;</span><br><span class="line">            childHandler.childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            ChannelFuture sync = <span class="keyword">this</span>.serverBootstrap.bind().sync();</span><br><span class="line">            InetSocketAddress addr = (InetSocketAddress) sync.channel().localAddress();</span><br><span class="line">            <span class="keyword">this</span>.port = addr.getPort();</span><br><span class="line">        &#125; <span class="keyword">catch</span> (InterruptedException e1) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> RuntimeException(<span class="string">"this.serverBootstrap.bind().sync() InterruptedException"</span>, e1);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>.channelEventListener != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">this</span>.nettyEventExecutor.start();</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">this</span>.timer.scheduleAtFixedRate(<span class="keyword">new</span> TimerTask() &#123;</span><br><span class="line"></span><br><span class="line">            <span class="meta">@Override</span></span><br><span class="line">            <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">                <span class="keyword">try</span> &#123;</span><br><span class="line">                    NettyRemotingServer.<span class="keyword">this</span>.scanResponseTable();</span><br><span class="line">                &#125; <span class="keyword">catch</span> (Throwable e) &#123;</span><br><span class="line">                    log.error(<span class="string">"scanResponseTable exception"</span>, e);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;, <span class="number">1000</span> * <span class="number">3</span>, <span class="number">1000</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
 <p><strong>总结</strong></p>
 <p>NameServer的启动主要就是初始化相关配置参数，构建一个基于Netty的网络服务器，启动Netty服务器，接收Broker和Producer、Consumer的网络请求，进行网络通信。</p>
+<p><img src="/images/nameserver启动.jpg" alt=""> </p>
+<p>注：图片来自于儒猿技术窝-从 0 开始带你成为消息中间件实战高手</p>
 <p><strong>参考</strong></p>
 <p>儒猿技术窝：从 0 开始带你成为消息中间件实战高手</p>
 
@@ -332,6 +337,12 @@
     
 
     <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/RocketMQ/" rel="tag"># RocketMQ</a>
+          
+        </div>
       
 
       
@@ -351,6 +362,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/03/20/【RocketMQ】Broker的启动/" rel="prev" title="Broker的启动">
+                Broker的启动 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -427,7 +442,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">22</span>
+                  <span class="site-state-item-count">24</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
@@ -440,7 +455,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">4</span>
+                  <span class="site-state-item-count">5</span>
                   <span class="site-state-item-name">tags</span>
                 
               </div>
