@@ -229,6 +229,201 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/03/【MySQL】MVVC机制/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2020/05/03/【MySQL】MVVC机制/" itemprop="url">【MySQL】MVVC机制</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2020-05-03T11:30:00+08:00">
+                2020-05-03
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <h3 id="MySQL隔离级别"><a href="#MySQL隔离级别" class="headerlink" title="MySQL隔离级别"></a>MySQL隔离级别</h3><p><strong>读未提交(Read Uncommitted)</strong>：某个事务读到了其他还未提交的事务对数据所作的修改，也就是某个事务只要修改了数据，其他事务就可以看到所作的修改。</p>
+<blockquote>
+<p>这种隔离级别下会发生脏读、不可重复读、幻读。</p>
+</blockquote>
+<p><strong>读提交(Read Committed)</strong>：某个事务提交之后，才可以被其他事务看到。</p>
+<blockquote>
+<p>这种隔离级别下会发生不可重复读、幻读。</p>
+</blockquote>
+<p><strong>可重复读(Repeatable Read)</strong>：一个事务在执行过程中看到的数据，总是跟这个事务在启动的时候看到的数据是一致的。</p>
+<blockquote>
+<p>MySQL的默认隔离级别，这种隔离级别下会发生幻读。</p>
+</blockquote>
+<blockquote>
+<p>不可重复读侧重于数据的修改，幻读侧重于数据的新增。假设事务A开始之前某个字段的值是A，事务B将它的值修改为了B，此时事务A再次查询得到的结果是B，与事务A开始时查到的值A不一致，就是不可重复读。假设事务A开始之前查询某个表只有一条记录，事务B往表中又插入了一条记录，此时事务A再次查询莫名多出一条记录，就是幻读。</p>
+</blockquote>
+<p><strong>串行化(Serializable)</strong>：对于同一条记录，读会加读锁，写会加写锁，读和读之间不会冲突，但是读和写之间会冲突，假如读写冲突，后访问的事务需要等待前一个事务执行完毕才可以继续执行。</p>
+<blockquote>
+<p>因为不允许事务并发执行，只能串行执行，因此不会有脏读、不可重复读、幻读问题，但是由于串行执行，性能比较差。</p>
+</blockquote>
+<h3 id="Read-View一致性视图"><a href="#Read-View一致性视图" class="headerlink" title="Read View一致性视图"></a>Read View一致性视图</h3><p>InnoDB中，每个事务在开始的时候都会申请一个事物id，这样每个事务会有一个唯一的事务id，每行数据也会有多个版本，每次事务更新的时候，会生成对应的事务版本，将事物id设置到这个事务版本的trx_id中,旧的事务版本也会保留:</p>
+<p><img src="/images/trx_version.png" alt=""> </p>
+<p><strong>注意：图中的版本链不是物理上真实存在的，实际上是根据undo log版本链计算出来的。</strong></p>
+<p><strong>undo log版本链</strong></p>
+<p>由于对数据的修改会生成undo log回滚日志，每个事务又会生成对应的事务版本，那么多个事务修改的时候就会形成一个undo log 版本链，每条数据包含两个隐藏字段，trx_id和roll_pointer：</p>
+<p><img src="/images/undolog_version.png" alt=""> </p>
+<p>trx_id：最近一次更新这条数据的事务id</p>
+<p>roll_pointer：指向当前事务之前生成的那个undo log</p>
+<blockquote>
+<p>所以多个事务串行执行的时候，每个事务都会生成一条undo log，通过roll_pointer将undo log串起来，形成undo log版本链，当没有事务需要用到这些undo log时，undo log才会被删除，假如有长事务，由于随时可能访问数据库的任何数据，在这个事务提交之前，它可能用到的undo log都将会保留，就会导致大量的占用存储空间，因此需要尽量避免长事务。</p>
+</blockquote>
+<p><strong>一致性视图</strong></p>
+<p>事务在启动的时候，InnoDb会为每一个事务创建一个数组，保存这个事务启动时，当前所有正在活跃（事务已启动但是还没提交）的事务ID，数组中事务ID最小值为低水位，已经生成过的事务的最大值的ID加1记作高水位，视图数组和高水位组成了当前事务的一致性视图，基于事务的trx_id和一致性视图可以实现读提交和不可重复读这两个隔离级别：</p>
+<p><img src="/images/readview.png" alt=""> </p>
+<p>注：图片来自于极客时间 — 林晓斌（丁奇）：MySQL实战</p>
+<p>对于当前事务来说，一个事务的id可能有以下三种情况：</p>
+<p>1.在视图数组中已提交的事务中，表示这个版本是已提交的事务，那么它是可以被当前事务读到的;</p>
+<p>2.在未开始事务中，表示这个版本的数据是由将来启动的事务生成的，对当前事务来说必然是不可见的;</p>
+<p>3.在未提交的事务集合中，有两种情况：</p>
+<p>（1）如果trx_id在当前事务的活跃数组中，表示这个版本是由未提交的事务生成的，对当前事务来说不可见;</p>
+<p>（2）如果trx_id不在当前事务的活跃数组中，表示这个版本的事务已提交，对当前事务来说可见;</p>
+<p><strong>基于ReadView实现读提交</strong></p>
+<p>假设系统当前存在两个活跃的事务B和事务C：</p>
+<p><img src="/images/rc.png" alt=""> </p>
+<p>（1）事务B第一次查询id值时会顺着undo log版本链寻找，首先会读取undo log版本链最新的值，undo log版本链中当前值为30，对应的trx_id 为30，trx_id比事务B中max_trx_id小，说明事务B在生成read view之前就存在这个活跃的事务，由于trx_id为30的事务在事务B的活跃列表中<br>在读提交隔离级别下，是不能读取到30这个值的，继续顺着版本链往前找，下一个是trx_id为10更新的值，trx_id =10 比事务B中的min_trx_id小，说明事务B生成read view之前，trx_id为10的事务就已经提交，所以可以读取trx_id=10的事务更新的值，事务B第一次查询得到ID的值为10;</p>
+<p>（2）事务B在第二次查询时,会重新生成read view，此时由于事务C已提交，trx_id为30的事务不在事务B的活跃事务列表中，此时事务B是可以读取到30的，所以事务B第二次读取到ID的值为30;</p>
+<blockquote>
+<p>实现读提交比较重要的一点就是每次在查询时都会重新生成read view。</p>
+</blockquote>
+<p><strong>基于ReadView实现可重复读</strong></p>
+<p>假设系统当前存在两个活跃的事务B和事务C：</p>
+<p><img src="/images/rr.png" alt=""> </p>
+<p>（1）与读提交中的第一次查询一致，得到的值为10;</p>
+<p>（2）事务B在第二次查询时,会继续使用第一次查询生成的一致性视图，此时虽然事务C已提交，但是由于没有重新生成一致性视图，trx_id为30的事务依旧在事务B的活跃事务列表中，此时事务B是不可以读取到30的，所以事务B第二次读取到ID的值为10;</p>
+<blockquote>
+<p>实现不可重复读比较重要的一点就是整个事务都会使用一个一致性视图，不是每次查询都重新生成一致性视图。</p>
+</blockquote>
+<p><strong>总结：</strong></p>
+<p>在读提交隔离级别下，每个语句执行前都会重新算出一个一致性视图。</p>
+<p>在可重复读隔离级别下，只在事务开始的时候创建一致性视图，之后事务里的其他查询都共用这个一致性视图。</p>
+<p><strong>当前读</strong></p>
+<p>当前读指的是读取undo log版本链中最新的记录</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> xx <span class="keyword">from</span> xx <span class="keyword">lock</span> <span class="keyword">in</span> <span class="keyword">share</span>;</span><br><span class="line"><span class="keyword">select</span> xx <span class="keyword">from</span> xx <span class="keyword">for</span> <span class="keyword">update</span>;</span><br></pre></td></tr></table></figure>
+<p>lock in share mode会加读锁，for update会加写锁，这两种语句都会进行当前读。</p>
+<p><strong>快照读</strong></p>
+<p>指的是按照生成的一致性视图读取数据。</p>
+<blockquote>
+<p>需要注意的时，如果是更新操作都是当前读。</p>
+</blockquote>
+<p>创建持续整个事务的一个一致性快照：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">start</span> <span class="keyword">transaction</span> <span class="keyword">with</span> <span class="keyword">consistent</span> <span class="keyword">snapshot</span>;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>在读提交隔离级别下，没有意义，等效于普通的start transaction。</p>
+</blockquote>
+<p><strong>参考：</strong></p>
+<p>极客时间 — 林晓斌（丁奇）：MySQL实战</p>
+<p>救火队队长：从零开始带你成为MySQL实战优化高</p>
+
+          
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/03/15/【Spring Cloud】Eureka缓存机制/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1735,161 +1930,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/07/08/【Spring】AOP原理（二）：AopProxy拦截机制/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="shan">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="SHAN">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/07/08/【Spring】AOP原理（二）：AopProxy拦截机制/" itemprop="url">AOP原理（二）：AopProxy拦截机制</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2018-07-08T11:33:59+08:00">
-                2018-07-08
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <p>以JDK动态代理为例，看一下Aop代理的拦截机制：</p>
-<h4 id="JdkDynamicAopProxy的invoke拦截"><a href="#JdkDynamicAopProxy的invoke拦截" class="headerlink" title="JdkDynamicAopProxy的invoke拦截"></a>JdkDynamicAopProxy的invoke拦截</h4><p>使用JDK动态代理生成代理对象时，需要传入三个参数，分别是目标对象的类加载器loader、目标对象的接口interfaces、一个InvocationHandler对象：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Object <span class="title">newProxyInstance</span><span class="params">(ClassLoader loader,</span></span></span><br><span class="line"><span class="function"><span class="params">                                          Class&lt;?&gt;[] interfaces,</span></span></span><br><span class="line"><span class="function"><span class="params">                                          InvocationHandler h)</span></span></span><br></pre></td></tr></table></figure></p>
-<p>InvocationHandler是一个接口，定义了一个invoke方法，对目标对象方法调用的拦截就是在invoke方法中实现的。<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">InvocationHandler</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> Object <span class="title">invoke</span><span class="params">(Object proxy, Method method, Object[] args)</span></span></span><br><span class="line"><span class="function">        <span class="keyword">throws</span> Throwable</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
-<h4 id="JdkDynamicAopProxy"><a href="#JdkDynamicAopProxy" class="headerlink" title="JdkDynamicAopProxy"></a>JdkDynamicAopProxy</h4><p><strong>1.拦截器链的调用</strong></p>
-<p>JdkDynamicAopProxy实现了InvocationHandler接口，因此生成代理对象时，可以将自身作为参数传入。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">JdkDynamicAopProxy</span> <span class="keyword">implements</span> <span class="title">AopProxy</span>, <span class="title">InvocationHandler</span>, <span class="title">Serializable</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> Object <span class="title">getProxy</span><span class="params">(@Nullable ClassLoader classLoader)</span> </span>&#123;</span><br><span class="line">		<span class="keyword">if</span> (logger.isDebugEnabled()) &#123;</span><br><span class="line">			logger.debug(<span class="string">"Creating JDK dynamic proxy: target source is "</span> + <span class="keyword">this</span>.advised.getTargetSource());</span><br><span class="line">		&#125;</span><br><span class="line">		Class&lt;?&gt;[] proxiedInterfaces = AopProxyUtils.completeProxiedInterfaces(<span class="keyword">this</span>.advised, <span class="keyword">true</span>);</span><br><span class="line">		findDefinedEqualsAndHashCodeMethods(proxiedInterfaces);</span><br><span class="line">		<span class="comment">//使用JDK动态代理生成代理对象</span></span><br><span class="line">		<span class="keyword">return</span> Proxy.newProxyInstance(classLoader, proxiedInterfaces, <span class="keyword">this</span>);</span><br><span class="line">	&#125;</span><br><span class="line">	</span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * InvocationHandler接口invoke方法的实现</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="meta">@Nullable</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> Object <span class="title">invoke</span><span class="params">(Object proxy, Method method, Object[] args)</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">		MethodInvocation invocation;</span><br><span class="line">		Object oldProxy = <span class="keyword">null</span>;</span><br><span class="line">		<span class="keyword">boolean</span> setProxyContext = <span class="keyword">false</span>;</span><br><span class="line"></span><br><span class="line">		TargetSource targetSource = <span class="keyword">this</span>.advised.targetSource;</span><br><span class="line">		Object target = <span class="keyword">null</span>;</span><br><span class="line"></span><br><span class="line">		<span class="keyword">try</span> &#123;</span><br><span class="line">			<span class="keyword">if</span> (!<span class="keyword">this</span>.equalsDefined &amp;&amp; AopUtils.isEqualsMethod(method)) &#123;</span><br><span class="line">				<span class="comment">// 如果目标对象没有实现Object的equals方法</span></span><br><span class="line">				<span class="keyword">return</span> equals(args[<span class="number">0</span>]);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> <span class="keyword">if</span> (!<span class="keyword">this</span>.hashCodeDefined &amp;&amp; AopUtils.isHashCodeMethod(method)) &#123;</span><br><span class="line">				<span class="comment">// 目标对象没有实现hashcode方法</span></span><br><span class="line">				<span class="keyword">return</span> hashCode();</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> <span class="keyword">if</span> (method.getDeclaringClass() == DecoratingProxy.class) &#123;</span><br><span class="line">				<span class="comment">// There is only getDecoratedClass() declared -&gt; dispatch to proxy config.</span></span><br><span class="line">				<span class="keyword">return</span> AopProxyUtils.ultimateTargetClass(<span class="keyword">this</span>.advised);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> <span class="keyword">if</span> (!<span class="keyword">this</span>.advised.opaque &amp;&amp; method.getDeclaringClass().isInterface() &amp;&amp;</span><br><span class="line">					method.getDeclaringClass().isAssignableFrom(Advised.class)) &#123;</span><br><span class="line">				<span class="comment">//根据代理对象的配置来调用服务</span></span><br><span class="line">				<span class="keyword">return</span> AopUtils.invokeJoinpointUsingReflection(<span class="keyword">this</span>.advised, method, args);</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			Object retVal;</span><br><span class="line"></span><br><span class="line">			<span class="keyword">if</span> (<span class="keyword">this</span>.advised.exposeProxy) &#123;</span><br><span class="line">				<span class="comment">// Make invocation available if necessary.</span></span><br><span class="line">				oldProxy = AopContext.setCurrentProxy(proxy);</span><br><span class="line">				setProxyContext = <span class="keyword">true</span>;</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			<span class="comment">// 获取目标对象</span></span><br><span class="line">			target = targetSource.getTarget();</span><br><span class="line">			Class&lt;?&gt; targetClass = (target != <span class="keyword">null</span> ? target.getClass() : <span class="keyword">null</span>);</span><br><span class="line"></span><br><span class="line">			<span class="comment">// 获取该方法的拦截器链</span></span><br><span class="line">			List&lt;Object&gt; chain = <span class="keyword">this</span>.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);</span><br><span class="line"></span><br><span class="line">			<span class="comment">// 如果没有拦截器，直接调用目标对象的方法</span></span><br><span class="line">			<span class="keyword">if</span> (chain.isEmpty()) &#123;</span><br><span class="line">				Object[] argsToUse = AopProxyUtils.adaptArgumentsIfNecessary(method, args);</span><br><span class="line">				retVal = AopUtils.invokeJoinpointUsingReflection(target, method, argsToUse);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> &#123;</span><br><span class="line">			    <span class="comment">//创建一个ReflectiveMethodInvocation对象，调用拦截器之后再调用目标对象的方法</span></span><br><span class="line">				invocation = <span class="keyword">new</span> ReflectiveMethodInvocation(proxy, target, method, args, targetClass, chain);</span><br><span class="line">				<span class="comment">// 沿着拦截器链继续前进</span></span><br><span class="line">				retVal = invocation.proceed();</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			<span class="comment">// 处理方法返回值</span></span><br><span class="line">			Class&lt;?&gt; returnType = method.getReturnType();</span><br><span class="line">			<span class="keyword">if</span> (retVal != <span class="keyword">null</span> &amp;&amp; retVal == target &amp;&amp;</span><br><span class="line">					returnType != Object.class &amp;&amp; returnType.isInstance(proxy) &amp;&amp;</span><br><span class="line">					!RawTargetAccess.class.isAssignableFrom(method.getDeclaringClass())) &#123;</span><br><span class="line">				retVal = proxy;</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> <span class="keyword">if</span> (retVal == <span class="keyword">null</span> &amp;&amp; returnType != Void.TYPE &amp;&amp; returnType.isPrimitive()) &#123;</span><br><span class="line">				<span class="keyword">throw</span> <span class="keyword">new</span> AopInvocationException(</span><br><span class="line">						<span class="string">"Null return value from advice does not match primitive return type for: "</span> + method);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">return</span> retVal;</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">finally</span> &#123;</span><br><span class="line">			<span class="keyword">if</span> (target != <span class="keyword">null</span> &amp;&amp; !targetSource.isStatic()) &#123;</span><br><span class="line">				<span class="comment">// Must have come from TargetSource.</span></span><br><span class="line">				targetSource.releaseTarget(target);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">if</span> (setProxyContext) &#123;</span><br><span class="line">				<span class="comment">// Restore old proxy.</span></span><br><span class="line">				AopContext.setCurrentProxy(oldProxy);</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>（1）在invoke方法中，如果没有配置拦截器，将会通过AopUtils的invokeJoinpointUsingReflection方法，使用反射机制对目标对象的方法进行调用。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">AopUtils</span>  </span>&#123;</span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 通过反射执行目标对象的方法</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="meta">@Nullable</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Object <span class="title">invokeJoinpointUsingReflection</span><span class="params">(@Nullable Object target, Method method, Object[] args)</span></span></span><br><span class="line"><span class="function">			<span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 使用反射机制调用目标对象的方法</span></span><br><span class="line">		<span class="keyword">try</span> &#123;</span><br><span class="line">			ReflectionUtils.makeAccessible(method);</span><br><span class="line">			<span class="keyword">return</span> method.invoke(target, args);</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">catch</span> (InvocationTargetException ex) &#123;</span><br><span class="line">			<span class="comment">// Invoked method threw a checked exception.</span></span><br><span class="line">			<span class="comment">// We must rethrow it. The client won't see the interceptor.</span></span><br><span class="line">			<span class="keyword">throw</span> ex.getTargetException();</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">catch</span> (IllegalArgumentException ex) &#123;</span><br><span class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> AopInvocationException(<span class="string">"AOP configuration seems to be invalid: tried calling method ["</span> +</span><br><span class="line">					method + <span class="string">"] on target ["</span> + target + <span class="string">"]"</span>, ex);</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">catch</span> (IllegalAccessException ex) &#123;</span><br><span class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> AopInvocationException(<span class="string">"Could not access method ["</span> + method + <span class="string">"]"</span>, ex);</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>（2）如果配置了拦截器，会获创建一个ReflectiveMethodInvocation对象，通过ReflectiveMethodInvocation对象的proceed方法逐个运行拦截器的拦截方法，从而完成整个拦截器链的调用。当拦截器链执行完毕后，同样使用反射机制执行目标对象中的方法。<br>在运行拦截器的拦截方法之前，会进行动态匹配判断，判断是否和定义的pointcut匹配，如果匹配就会执行这个advice。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ReflectiveMethodInvocation</span> <span class="keyword">implements</span> <span class="title">ProxyMethodInvocation</span>, <span class="title">Cloneable</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">	<span class="meta">@Nullable</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> Object <span class="title">proceed</span><span class="params">()</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">		<span class="comment">//	如果拦截器链调用完毕</span></span><br><span class="line">		<span class="keyword">if</span> (<span class="keyword">this</span>.currentInterceptorIndex == <span class="keyword">this</span>.interceptorsAndDynamicMethodMatchers.size() - <span class="number">1</span>) &#123;</span><br><span class="line">		    <span class="comment">//这里依旧使用AopUtils的invokeJoinpointUsingReflection方法使用反射机制完成目标对象方法的调用</span></span><br><span class="line">			<span class="keyword">return</span> invokeJoinpoint();</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="comment">//获取定义的拦截器</span></span><br><span class="line">		Object interceptorOrInterceptionAdvice =</span><br><span class="line">				<span class="keyword">this</span>.interceptorsAndDynamicMethodMatchers.get(++<span class="keyword">this</span>.currentInterceptorIndex);</span><br><span class="line">		<span class="comment">//如果是InterceptorAndDynamicMethodMatcher的实例</span></span><br><span class="line">		<span class="keyword">if</span> (interceptorOrInterceptionAdvice <span class="keyword">instanceof</span> InterceptorAndDynamicMethodMatcher) &#123;</span><br><span class="line">			</span><br><span class="line">			InterceptorAndDynamicMethodMatcher dm =</span><br><span class="line">					(InterceptorAndDynamicMethodMatcher) interceptorOrInterceptionAdvice;</span><br><span class="line">			<span class="comment">// 对拦截器进行动态匹配判断，如果和定义的切点匹配，将会执行这个advice</span></span><br><span class="line">			<span class="keyword">if</span> (dm.methodMatcher.matches(<span class="keyword">this</span>.method, <span class="keyword">this</span>.targetClass, <span class="keyword">this</span>.arguments)) &#123;</span><br><span class="line">			    <span class="comment">//执行拦截器的方法</span></span><br><span class="line">				<span class="keyword">return</span> dm.interceptor.invoke(<span class="keyword">this</span>);</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> &#123;</span><br><span class="line">				<span class="comment">//如果未匹配，继续拦截器链中的下一个拦截器</span></span><br><span class="line">				<span class="keyword">return</span> proceed();</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">else</span> &#123;</span><br><span class="line">			<span class="comment">// 如果是一个拦截器，直接调用该拦截器对应的方法</span></span><br><span class="line">			<span class="keyword">return</span> ((MethodInterceptor) interceptorOrInterceptionAdvice).invoke(<span class="keyword">this</span>);</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	</span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 调用目标对象的方法</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="meta">@Nullable</span></span><br><span class="line">	<span class="function"><span class="keyword">protected</span> Object <span class="title">invokeJoinpoint</span><span class="params">()</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">	    <span class="comment">//同样使用反射执行方法</span></span><br><span class="line">		<span class="keyword">return</span> AopUtils.invokeJoinpointUsingReflection(<span class="keyword">this</span>.target, <span class="keyword">this</span>.method, <span class="keyword">this</span>.arguments);</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>2.配置通知器</strong></p>
-<p>回到JdkDynamicAopProxy的ivoke方法中，有一个获取当前方法的拦截器链的过程：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">List&lt;Object&gt; chain = <span class="keyword">this</span>.advised.getInterceptorsAndDynamicInterceptionAdvice(method, targetClass);</span><br></pre></td></tr></table></figure>
-<p>getInterceptorsAndDynamicInterceptionAdvice方法是在AdvisedSupport类中实现的，在这个方法中，还使用到了缓存：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">AdvisedSupport</span> <span class="keyword">extends</span> <span class="title">ProxyConfig</span> <span class="keyword">implements</span> <span class="title">Advised</span> </span>&#123;</span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 从配置中获取拦截器</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> List&lt;Object&gt; <span class="title">getInterceptorsAndDynamicInterceptionAdvice</span><span class="params">(Method method, @Nullable Class&lt;?&gt; targetClass)</span> </span>&#123;</span><br><span class="line">	    <span class="comment">//使用了缓存</span></span><br><span class="line">		MethodCacheKey cacheKey = <span class="keyword">new</span> MethodCacheKey(method);</span><br><span class="line">		<span class="comment">//从缓存中获取拦截器</span></span><br><span class="line">		List&lt;Object&gt; cached = <span class="keyword">this</span>.methodCache.get(cacheKey);</span><br><span class="line">		<span class="comment">//如果缓存中不存在</span></span><br><span class="line">		<span class="keyword">if</span> (cached == <span class="keyword">null</span>) &#123;</span><br><span class="line">		    <span class="comment">// 使用advisorChainFactory获取拦截器链</span></span><br><span class="line">			cached = <span class="keyword">this</span>.advisorChainFactory.getInterceptorsAndDynamicInterceptionAdvice(</span><br><span class="line">					<span class="keyword">this</span>, method, targetClass);</span><br><span class="line">			<span class="keyword">this</span>.methodCache.put(cacheKey, cached);</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> cached;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>如果缓存中不存在拦截器链，会调用AdvisorChainFactory的getInterceptorsAndDynamicInterceptionAdvice方法获取拦截器链，AdvisorChainFactory是一个生产通知器链的工厂：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">AdvisorChainFactory</span> </span>&#123;</span><br><span class="line">	<span class="function">List&lt;Object&gt; <span class="title">getInterceptorsAndDynamicInterceptionAdvice</span><span class="params">(Advised config, Method method, @Nullable Class&lt;?&gt; targetClass)</span></span>;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>AdvisorChainFactory是一个接口,它的子类DefaultAdvisorChainFactory实现了该方法：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">DefaultAdvisorChainFactory</span> <span class="keyword">implements</span> <span class="title">AdvisorChainFactory</span>, <span class="title">Serializable</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> List&lt;Object&gt; <span class="title">getInterceptorsAndDynamicInterceptionAdvice</span><span class="params">(</span></span></span><br><span class="line"><span class="function"><span class="params">			Advised config, Method method, @Nullable Class&lt;?&gt; targetClass)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">		<span class="comment">// 根据配置中通知器的个数设置list的长度</span></span><br><span class="line">		List&lt;Object&gt; interceptorList = <span class="keyword">new</span> ArrayList&lt;&gt;(config.getAdvisors().length);</span><br><span class="line">		Class&lt;?&gt; actualClass = (targetClass != <span class="keyword">null</span> ? targetClass : method.getDeclaringClass());</span><br><span class="line">		<span class="keyword">boolean</span> hasIntroductions = hasMatchingIntroductions(config, actualClass);</span><br><span class="line">		<span class="comment">//用到了适配器模式，通过适配器加入拦截器链</span></span><br><span class="line">		AdvisorAdapterRegistry registry = GlobalAdvisorAdapterRegistry.getInstance();</span><br><span class="line">		<span class="comment">//遍历通知器集合</span></span><br><span class="line">		<span class="keyword">for</span> (Advisor advisor : config.getAdvisors()) &#123;</span><br><span class="line">			<span class="keyword">if</span> (advisor <span class="keyword">instanceof</span> PointcutAdvisor) &#123;</span><br><span class="line">				<span class="comment">// Add it conditionally.</span></span><br><span class="line">				PointcutAdvisor pointcutAdvisor = (PointcutAdvisor) advisor;</span><br><span class="line">				<span class="keyword">if</span> (config.isPreFiltered() || pointcutAdvisor.getPointcut().getClassFilter().matches(actualClass)) &#123;</span><br><span class="line">				    <span class="comment">//通知器转为对应的拦截器</span></span><br><span class="line">					MethodInterceptor[] interceptors = registry.getInterceptors(advisor);</span><br><span class="line">					MethodMatcher mm = pointcutAdvisor.getPointcut().getMethodMatcher();</span><br><span class="line">					<span class="comment">//判断是否匹配</span></span><br><span class="line">					<span class="keyword">if</span> (MethodMatchers.matches(mm, method, actualClass, hasIntroductions)) &#123;</span><br><span class="line">						<span class="keyword">if</span> (mm.isRuntime()) &#123;</span><br><span class="line">							<span class="keyword">for</span> (MethodInterceptor interceptor : interceptors) &#123;</span><br><span class="line">								interceptorList.add(<span class="keyword">new</span> InterceptorAndDynamicMethodMatcher(interceptor, mm));</span><br><span class="line">							&#125;</span><br><span class="line">						&#125;</span><br><span class="line">						<span class="keyword">else</span> &#123;</span><br><span class="line">							interceptorList.addAll(Arrays.asList(interceptors));</span><br><span class="line">						&#125;</span><br><span class="line">					&#125;</span><br><span class="line">				&#125;</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> <span class="keyword">if</span> (advisor <span class="keyword">instanceof</span> IntroductionAdvisor) &#123;</span><br><span class="line">				IntroductionAdvisor ia = (IntroductionAdvisor) advisor;</span><br><span class="line">				<span class="keyword">if</span> (config.isPreFiltered() || ia.getClassFilter().matches(actualClass)) &#123;</span><br><span class="line">					Interceptor[] interceptors = registry.getInterceptors(advisor);</span><br><span class="line">					interceptorList.addAll(Arrays.asList(interceptors));</span><br><span class="line">				&#125;</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">else</span> &#123;</span><br><span class="line">				Interceptor[] interceptors = registry.getInterceptors(advisor);</span><br><span class="line">				interceptorList.addAll(Arrays.asList(interceptors));</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="keyword">return</span> interceptorList;</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>来看这行代码，从GlobalAdvisorAdapterRegistry类中获取了通知适配器注册实例AdvisorAdapterRegistry：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">AdvisorAdapterRegistry registry = GlobalAdvisorAdapterRegistry.getInstance();</span><br></pre></td></tr></table></figure>
-<h5 id="GlobalAdvisorAdapterRegistry"><a href="#GlobalAdvisorAdapterRegistry" class="headerlink" title="GlobalAdvisorAdapterRegistry"></a>GlobalAdvisorAdapterRegistry</h5><p>GlobalAdvisorAdapterRegistry是一个抽象类，返回的是一个单例模式的DefaultAdvisorAdapterRegistry对象：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">GlobalAdvisorAdapterRegistry</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 单例模式，使用了DefaultAdvisorAdapterRegistry实现</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">private</span> <span class="keyword">static</span> AdvisorAdapterRegistry instance = <span class="keyword">new</span> DefaultAdvisorAdapterRegistry();</span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 返回实例</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">static</span> AdvisorAdapterRegistry <span class="title">getInstance</span><span class="params">()</span> </span>&#123;</span><br><span class="line">		<span class="keyword">return</span> instance;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 重置</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">reset</span><span class="params">()</span> </span>&#123;</span><br><span class="line">		instance = <span class="keyword">new</span> DefaultAdvisorAdapterRegistry();</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
-<h5 id="DefaultAdvisorAdapterRegistry"><a href="#DefaultAdvisorAdapterRegistry" class="headerlink" title="DefaultAdvisorAdapterRegistry"></a>DefaultAdvisorAdapterRegistry</h5><p>DefaultAdvisorAdapterRegistry在构造方法中注册了一系列的适配器，在getInterceptors方法中通过适配器模式完成了advice向拦截器的转换：<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">DefaultAdvisorAdapterRegistry</span> <span class="keyword">implements</span> <span class="title">AdvisorAdapterRegistry</span>, <span class="title">Serializable</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">private</span> <span class="keyword">final</span> List&lt;AdvisorAdapter&gt; adapters = <span class="keyword">new</span> ArrayList&lt;&gt;(<span class="number">3</span>);</span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 构造函数，注册适配器</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="title">DefaultAdvisorAdapterRegistry</span><span class="params">()</span> </span>&#123;</span><br><span class="line">	    <span class="comment">//前置通知</span></span><br><span class="line">		registerAdvisorAdapter(<span class="keyword">new</span> MethodBeforeAdviceAdapter());</span><br><span class="line">		registerAdvisorAdapter(<span class="keyword">new</span> AfterReturningAdviceAdapter());</span><br><span class="line">		registerAdvisorAdapter(<span class="keyword">new</span> ThrowsAdviceAdapter());</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> Advisor <span class="title">wrap</span><span class="params">(Object adviceObject)</span> <span class="keyword">throws</span> UnknownAdviceTypeException </span>&#123;</span><br><span class="line">		<span class="keyword">if</span> (adviceObject <span class="keyword">instanceof</span> Advisor) &#123;</span><br><span class="line">			<span class="keyword">return</span> (Advisor) adviceObject;</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">if</span> (!(adviceObject <span class="keyword">instanceof</span> Advice)) &#123;</span><br><span class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> UnknownAdviceTypeException(adviceObject);</span><br><span class="line">		&#125;</span><br><span class="line">		Advice advice = (Advice) adviceObject;</span><br><span class="line">		<span class="keyword">if</span> (advice <span class="keyword">instanceof</span> MethodInterceptor) &#123;</span><br><span class="line">			<span class="comment">// So well-known it doesn't even need an adapter.</span></span><br><span class="line">			<span class="keyword">return</span> <span class="keyword">new</span> DefaultPointcutAdvisor(advice);</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">for</span> (AdvisorAdapter adapter : <span class="keyword">this</span>.adapters) &#123;</span><br><span class="line">			<span class="comment">// Check that it is supported.</span></span><br><span class="line">			<span class="keyword">if</span> (adapter.supportsAdvice(advice)) &#123;</span><br><span class="line">				<span class="keyword">return</span> <span class="keyword">new</span> DefaultPointcutAdvisor(advice);</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">throw</span> <span class="keyword">new</span> UnknownAdviceTypeException(advice);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 获取拦截器</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="keyword">public</span> MethodInterceptor[] getInterceptors(Advisor advisor) <span class="keyword">throws</span> UnknownAdviceTypeException &#123;</span><br><span class="line">	    <span class="comment">//创建一个list，存放的类型是MethodInterceptor</span></span><br><span class="line">		List&lt;MethodInterceptor&gt; interceptors = <span class="keyword">new</span> ArrayList&lt;&gt;(<span class="number">3</span>);</span><br><span class="line">		<span class="comment">//从Advisor通知器配置中获取advice通知</span></span><br><span class="line">		Advice advice = advisor.getAdvice();</span><br><span class="line">		<span class="comment">//如果是MethodInterceptor类型的，不需要适配器，直接加入拦截器集合中</span></span><br><span class="line">		<span class="keyword">if</span> (advice <span class="keyword">instanceof</span> MethodInterceptor) &#123;</span><br><span class="line">			interceptors.add((MethodInterceptor) advice);</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">for</span> (AdvisorAdapter adapter : <span class="keyword">this</span>.adapters) &#123;</span><br><span class="line">		    <span class="comment">//这里判断取得的advice是什么类型的通知器，从而注册不同的拦截器</span></span><br><span class="line">			<span class="keyword">if</span> (adapter.supportsAdvice(advice)) &#123;</span><br><span class="line">			    <span class="comment">//advice转为拦截器加入到集合</span></span><br><span class="line">				interceptors.add(adapter.getInterceptor(advisor));</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">if</span> (interceptors.isEmpty()) &#123;</span><br><span class="line">			<span class="keyword">throw</span> <span class="keyword">new</span> UnknownAdviceTypeException(advisor.getAdvice());</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> interceptors.toArray(<span class="keyword">new</span> MethodInterceptor[<span class="number">0</span>]);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">registerAdvisorAdapter</span><span class="params">(AdvisorAdapter adapter)</span> </span>&#123;</span><br><span class="line">		<span class="keyword">this</span>.adapters.add(adapter);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
-<p>getInterceptors方法中，传入的参数是Advisor类型的通知，返回的是方法拦截器集合，每个通知器都有对应的方法拦截器，比如BeforeAdvice通知器的拦截器是MethodBeforeAdviceInterceptor，该方法的作用就是通过适配器模式将通知器转为对应的方法拦截器。所以通知器如果是MethodInterceptor类型的直接加入集合，如果不是，需要通过适配器模式将通知转为拦截器:</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">for</span> (AdvisorAdapter adapter : <span class="keyword">this</span>.adapters) &#123;</span><br><span class="line">	    <span class="comment">//这里判断取得的advice是什么类型的通知器，从而注册不同的拦截器</span></span><br><span class="line">		<span class="keyword">if</span> (adapter.supportsAdvice(advice)) &#123;</span><br><span class="line">		    <span class="comment">//通过适配器模式advice转为拦截器加入到集合</span></span><br><span class="line">			interceptors.add(adapter.getInterceptor(advisor));</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br></pre></td></tr></table></figure>
-<h4 id="Spring-AOP适配器模式的应用"><a href="#Spring-AOP适配器模式的应用" class="headerlink" title="Spring AOP适配器模式的应用"></a>Spring AOP适配器模式的应用</h4><h5 id="1-AdvisorAdapter"><a href="#1-AdvisorAdapter" class="headerlink" title="1.AdvisorAdapter"></a>1.AdvisorAdapter</h5><p>上面知道通过调用AdvisorAdapter的getInterceptor方法将通知器advisor转为了对应的拦截器MethodInterceptor，AdvisorAdapter是一个接口，定义了两个方法，分别是<br>supportsAdvice和getInterceptor：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">AdvisorAdapter</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 判断通知器的类型是否支持</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="function"><span class="keyword">boolean</span> <span class="title">supportsAdvice</span><span class="params">(Advice advice)</span></span>;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * advisor转为MethodInterceptor</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="function">MethodInterceptor <span class="title">getInterceptor</span><span class="params">(Advisor advisor)</span></span>;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h5 id="MethodInterceptor"><a href="#MethodInterceptor" class="headerlink" title="MethodInterceptor"></a>MethodInterceptor</h5><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@FunctionalInterface</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">MethodInterceptor</span> <span class="keyword">extends</span> <span class="title">Interceptor</span> </span>&#123;</span><br><span class="line">	</span><br><span class="line">	<span class="function">Object <span class="title">invoke</span><span class="params">(MethodInvocation invocation)</span> <span class="keyword">throws</span> Throwable</span>;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h5 id="2-MethodBeforeAdviceAdapter"><a href="#2-MethodBeforeAdviceAdapter" class="headerlink" title="2.MethodBeforeAdviceAdapter"></a>2.MethodBeforeAdviceAdapter</h5><p>以MethodBeforeAdviceAdapter为例看一下如何转换的：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">MethodBeforeAdviceAdapter</span> <span class="keyword">implements</span> <span class="title">AdvisorAdapter</span>, <span class="title">Serializable</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">supportsAdvice</span><span class="params">(Advice advice)</span> </span>&#123;</span><br><span class="line">	    <span class="comment">//判断通知器是否是MethodBeforeAdvice的实例</span></span><br><span class="line">		<span class="keyword">return</span> (advice <span class="keyword">instanceof</span> MethodBeforeAdvice);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> MethodInterceptor <span class="title">getInterceptor</span><span class="params">(Advisor advisor)</span> </span>&#123;</span><br><span class="line">	    <span class="comment">//通知器转为MethodBeforeAdvice类型</span></span><br><span class="line">		MethodBeforeAdvice advice = (MethodBeforeAdvice) advisor.getAdvice();</span><br><span class="line">		<span class="comment">//MethodBeforeAdvice转为MethodBeforeAdviceInterceptor类型</span></span><br><span class="line">		<span class="keyword">return</span> <span class="keyword">new</span> MethodBeforeAdviceInterceptor(advice);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h5 id="MethodBeforeAdviceInterceptor"><a href="#MethodBeforeAdviceInterceptor" class="headerlink" title="MethodBeforeAdviceInterceptor"></a>MethodBeforeAdviceInterceptor</h5><p>MethodBeforeAdviceInterceptor实现了MethodInterceptor接口，<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">MethodBeforeAdviceInterceptor</span> <span class="keyword">implements</span> <span class="title">MethodInterceptor</span>, <span class="title">Serializable</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">private</span> MethodBeforeAdvice advice;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	<span class="comment">/**</span></span><br><span class="line"><span class="comment">	 * 构造函数</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> <span class="title">MethodBeforeAdviceInterceptor</span><span class="params">(MethodBeforeAdvice advice)</span> </span>&#123;</span><br><span class="line">		Assert.notNull(advice, <span class="string">"Advice must not be null"</span>);</span><br><span class="line">		<span class="keyword">this</span>.advice = advice;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 拦截器的回调方法，会在代理对象的方法被调用前调用</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">	<span class="meta">@Override</span></span><br><span class="line">	<span class="function"><span class="keyword">public</span> Object <span class="title">invoke</span><span class="params">(MethodInvocation mi)</span> <span class="keyword">throws</span> Throwable </span>&#123;</span><br><span class="line">		<span class="keyword">this</span>.advice.before(mi.getMethod(), mi.getArguments(), mi.getThis() );</span><br><span class="line">		<span class="keyword">return</span> mi.proceed();</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
-<p><strong>参考：</strong></p>
-<p>spring技术内幕:深入解析spring架构与设计原理</p>
-<p><a href="https://blog.csdn.net/jzq114/article/details/51319212" target="_blank" rel="noopener">jzq114：AOP源码分析之初始化通知器链</a></p>
-<p><a href="https://segmentfault.com/a/1190000011856448" target="_blank" rel="noopener">峰峰峰峰峰：一起学设计模式 - 适配器模式</a></p>
-<p><strong>Spring版本:5.0.5</strong></p>
-
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
   </section>
 
   
@@ -1940,7 +1980,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">27</span>
+                  <span class="site-state-item-count">28</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
