@@ -229,6 +229,225 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/16/【MySQL】sort buffer和join buffer/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2020/05/16/【MySQL】sort buffer和join buffer/" itemprop="url">【MySQL】sort buffer和join buffer</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2020-05-16T21:00:00+08:00">
+                2020-05-16
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <p>sort buffer和join buffer两者没什么关系，只是最近重读了极客时间的MySQL实战，又加深了对MySQL的认知，这里记录一下sort buffer和join buffer两个知识点，以便加深印象。</p>
+<h3 id="sort-buffer"><a href="#sort-buffer" class="headerlink" title="sort buffer"></a>sort buffer</h3><p>sort buffer从名字上就可以看出肯定和排序有关，MySQL会为每个线程分配一块内存，用于排序，这个内存就称为sort buffer。</p>
+<p>内存的大小可以通过sort_buffer_size参数控制，如果需要排序的数据量超过了sort_buffer_size的大小，就需要借助磁盘临时文件进行外部排序，一般使用归并排序算法，所以排序的数据可能需要被切分，每一份单独排序后存在临时文件中，最后将所有的文件合并成一个有序的大文件。</p>
+<blockquote>
+<p>可以通过打开optimizer_trace，查看optimizer_trace结果中的number_of_tmp_files，判断是否使用了临时文件以及临时文件的个数。</p>
+</blockquote>
+<h4 id="全字段排序"><a href="#全字段排序" class="headerlink" title="全字段排序"></a>全字段排序</h4><p>假设有一个表t有name、age、city字段，在city上创建了索引，现在执行：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> city,<span class="keyword">name</span>,age <span class="keyword">from</span> t <span class="keyword">where</span> city = <span class="string">'杭州'</span> <span class="keyword">order</span> <span class="keyword">by</span> <span class="keyword">name</span> <span class="keyword">limit</span> <span class="number">1000</span>;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/sort_buffer.png" alt=""> </p>
+<p><strong>语句的执行流程：</strong></p>
+<p>（1）初始化sort_buffer，放入city、name、age三个字段；</p>
+<p>（2）通过city上的索引，找到第一个city是杭州的节点，通过节点中保存的主键id去主键索引寻找该条记录，取出name、city和age字段的值，放入到sort_buffer中；</p>
+<p>（3）继续寻找下一个满足条件的主键，通过id在主键索引中取出三个字段的值放入sort_buffer；</p>
+<p>（4）重复步骤2和3，直到找到不满足条件的city为止；</p>
+<p>（5）对sort_buffer中的数据按照name字段做排序；</p>
+<p>（6）按照排序结果取前1000行返回给客户端；</p>
+<h4 id="rowid排序"><a href="#rowid排序" class="headerlink" title="rowid排序"></a>rowid排序</h4><p>在全字段排序中，假如select中取的字段太多，sort_buffer可能放不下，就需要借助外部排序，排序的性能会下降，max_length_for_sort_data参数可以修改排序的单行最大长度，在全字段排序中取了city、name和age字段，三个字段的数据类型长度加起来就是排序的单行长度，假设全排序中单行长度超过了max_length_for_sort_data，MySQL为了提高性能，会采用rowid排序。</p>
+<p><strong>rowid的排序流程：</strong></p>
+<p>（1）初始化sort_buffer，放入name（因为需要根据name进行排序）和id；</p>
+<p>（2）从city索引中找到第一个city为杭州的数据的id，到主键索引中找到对应的记录，取name和id两个字段的值，放入sort_buffer；</p>
+<p>（3）继续寻找下一个满足条件的值，将id和name放入sort_buffer；</p>
+<p>（4）重复步骤2和3，知道找到不满足的条件的city为止；</p>
+<p>（5）对sort_buffer中的数据按照name排序；</p>
+<p>（6）根据排序的结果取前1000行，因为sort_buffer中只放了name和id，没有age和city，所以此时需要根据id再次从主键所以中回表取出city 、name和age的值，最后返回给客户端；</p>
+<p><img src="/images/rowid.jpg" alt=""> </p>
+<center>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</center>
+
+<p>可以发现与字段全排序相比，rowid比字段全排序多了一次最后根据id从主键索引回表的过程。</p>
+<p><strong>总结：</strong></p>
+<p>1.如果sort_buffer足够大，会优先选择字段全排序，把需要的字段全放入sort_buffer中，排序后可直接返回结果；</p>
+<p>2.如果sort_buffer无法满足排序的数量，会采用rowid排序算法，但是需要根据id回表查询所需的字段；</p>
+<p><strong>优化：</strong></p>
+<p>如果根据索引取到的数据就是有序的，那么就可以省去排序的过程了，所以可以在表上建一个city和name的联合索引，此时的查询流程如下：</p>
+<p><img src="/images/cityname.png" alt=""> </p>
+<center>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</center>
+
+<p>（1）从联合索引(city,name)中找到第一个满足city是杭州的数据的主键id;</p>
+<p>（2）到主键索引中根据主键id取name、city、age三个字段的值，返回结果到客户端；</p>
+<p>（3）继续取下一个记录的id；</p>
+<p>（4）重复步骤2和3，直到第1000条记录或者不满足条件的时候为止；</p>
+<p>可以看到如果加了city和name的联合索引，可以省去排序的过程，再继续优化，借助覆盖索引，创建city、name和age的联合索引，这样可以把回表的步骤也省掉了：</p>
+<p>（1）从联合索引(city,name,age)中找到第一个满足city是杭州的节点，因为创建的是联合索引，索引节点中包含city、name、age的值，直接将结果集返回给客户端即可；</p>
+<p>（2）从联合索引取下一个满足条件的记录，返回数据给客户端；</p>
+<p>（3）重复执行步骤2，直到第1000条记录或者不满足条件为止；</p>
+<h3 id="join-buffer"><a href="#join-buffer" class="headerlink" title="join buffer"></a>join buffer</h3><h4 id="Index-Nested-Loop-Join（NLJ）"><a href="#Index-Nested-Loop-Join（NLJ）" class="headerlink" title="Index Nested-Loop Join（NLJ）"></a>Index Nested-Loop Join（NLJ）</h4><p>假设有两张表t1和t2，表结构一致，除了主键id之外只有两个字段a和b，在a字段上创建索引，然后执行语句：</p>
+<p><img src="/images/table.png" alt=""> </p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> t1 <span class="keyword">straight_join</span> t2 <span class="keyword">on</span> (t1.a=t2.a);</span><br></pre></td></tr></table></figure>
+<p>执行流程：</p>
+<p>（1）从表t1读入一行数据R；</p>
+<p>（2）从数据行R中读取a字段的值，到表t2中查找，由于t2表中a字段创建了索引，所以可以借助索引在表t2中查找；</p>
+<p>（3）将t2表中查找到满足条件的所有行，与t1做关联；</p>
+<p>（4）重复执行步骤1到3，遍历表t1，直到所有数据被读完；</p>
+<p>在这个过程中，t1属于驱动表，t2属于被驱动表，驱动表t1做了全表扫描，每次取出一行，然后取出字段a的值再从t2中借助索引进行查找，完成表数据行的关联，由于在被驱动表中查找时使用到了索引，所以这种查询流程称为Index Nested-Loop Join。</p>
+<h4 id="Simple-Nested-Loop-Join"><a href="#Simple-Nested-Loop-Join" class="headerlink" title="Simple Nested-Loop Join"></a>Simple Nested-Loop Join</h4><p>修改一下查询语句，假如执行下面这个查询：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> t1 <span class="keyword">straight_join</span> t2 <span class="keyword">on</span> (t1.a=t2.b);</span><br></pre></td></tr></table></figure>
+<p>表t2的字段b是没有索引的，所以此时的查询流程如下：</p>
+<p>（1）从表t1读入一行数据R；</p>
+<p>（2）从数据行R中读取a字段的值，到表t2中查找，由于t2表中b字段没有索引，所以只能对t2进行全表扫描，查找满足条件的值；</p>
+<p>（3）将t2表中查找到满足条件的所有行，与t1做关联；</p>
+<p>（4）重复执行步骤1到3，遍历表t1，直到所有数据被读完；</p>
+<p>假如驱动表的行数为N，被驱动表的行数为M，如果被驱动表上没有可用的索引，那么将会扫描N<em>M行，可以看到在N=100，M=1000时，N</em>M = 100000，只是这么小的数据量下就要扫描10万行，使用此算法代价会比较大，所以有了BNL算法Block Nested-Loop Join。</p>
+<h4 id="Block-Nested-Loop-Join（BNL）"><a href="#Block-Nested-Loop-Join（BNL）" class="headerlink" title="Block Nested-Loop Join（BNL）"></a>Block Nested-Loop Join（BNL）</h4><p>在被驱动表上没有可用的索引时，BNL算法的执行流程：</p>
+<p>（1）将表t1的数据放入线程内存join_buffer中，由于语句是select * 所以t1的所有数据会被加载到join_buffer中；</p>
+<p>（2）扫描表t2，取出表t2的每一行，与join_buffer中的数据做对比，如果满足条件，将数据关联，作为结果集的一部分返回；</p>
+<p><img src="/images/bnl.jpg" alt=""> </p>
+<center>注：图片来源于极客时间-林晓斌（丁奇）：MySQL实战</center>
+
+<p>假设表t1的行数为N，t2的行数为M：</p>
+<ul>
+<li>两张表都做了一次全表扫描，扫描行数是M+N；</li>
+<li>表t1的每一行都要和表t2的每一行作比较，判断次数为M<em>N，虽然还是M</em>N但是是在内存中做的判断，因此性能会提示很多；</li>
+</ul>
+<p>假如表t1的数据量太大，join_buffer中放不下，那么将会采用分段放的方式：</p>
+<p>（1）将表t1的数据放入join_buffer中，假设在第50行的时候join_buffer满了，进行第2步；</p>
+<p>（2）扫描表t2，取出表t2的每一行，与join_buffer中的数据做对比，如果满足条件，将数据关联，作为结果集的一部分返回；</p>
+<p>（3）清空join_buffer；</p>
+<p>（4）继续扫描t1，将剩余的行放入join_buffer，重复步骤1、2、3；</p>
+<p><strong>总结：</strong></p>
+<p>（1）尽量使用小表做驱动表；</p>
+<p>（2）使用BNL算法在大表上的join操作可能要扫描被驱动表多次，占用大量的IO资源，在判断join条件时可能需要大量的判断占用CPU资源，尽量避免这种join；</p>
+<p>（3）会导致Buffer Pool的热数据被淘汰，影响内存命中率；</p>
+<h4 id="Multi-Range-Read-优化"><a href="#Multi-Range-Read-优化" class="headerlink" title="Multi-Range Read 优化"></a>Multi-Range Read 优化</h4><p>我们知道，MySQL InnoDB的二级索引叶子节点中存储的是主键的值，如果需要查询其他字段的值，需要根据主键的值去主键索引上查找，才能拿到其他字段的值，这个操作称为回表，假设有一表t，在字段a上创建了索引，执行如下语句：</p>
+<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">select</span> * <span class="keyword">from</span> t1 <span class="keyword">where</span> a&gt;=<span class="number">1</span> <span class="keyword">and</span> a&lt;=<span class="number">100</span>;</span><br></pre></td></tr></table></figure>
+<p>执行流程：</p>
+<p>（1）在字段a上建立的二级索引中找到第一个a值大于1的节点，找到对应的主键；</p>
+<p>（2）根据主键值去主键索引中查找，获取该行记录所有字段的值，作为返回结果集；</p>
+<p>（3）循环步骤1和2，直到把小于等于100的值全部寻找完毕；</p>
+<blockquote>
+<p>在这个过程中，由于每次只根据一个主键ID去主键索引中查找，每次查找就变成了随机访问，性能相对较差，因为大部分数据都是按照主键递增顺序插入得到的，假如按照主键递增顺序查找的话，对磁盘的读比较接近顺序读，这样就可以提升读性能，这就是MRR优化的思路。</p>
+</blockquote>
+<p>MRR优化后的执行流程：</p>
+<p>（1）根据a字段上的二级索引找到所有满足条件的记录，将所有的主键ID值放入read_rnd_buffer中；</p>
+<p>（2）将read_rnd_buffer中的id进行递增排序；</p>
+<p>（3）根据read_rnd_buffer中排好序的id依次到主键索引中查询记录，并作为返回结果；</p>
+<p><strong>MRR的核心思想在于得到足够多的主键ID，然后对ID排序，再去主键索引查找数据，将随机访问改为尽量接近顺序访问。</strong></p>
+<h4 id="Batched-Key-Access优化"><a href="#Batched-Key-Access优化" class="headerlink" title="Batched Key Access优化"></a>Batched Key Access优化</h4><p>MySQL在5.6版本之后引入了Batched Key Access(BKA) 算法，它可以对 Index Nested-Loop Join（NLJ） 进行优化。</p>
+<p>NLJ算法的流程是从驱动表t1，一行一行的取出a值，再到被驱动表t2中根据字段a的索引去查找，对于表t2每次只匹配一个值，为了让t2表可以一次性多拿到一些值，可以把t1表的数据取出来之后先放到临时内存中，然后批量的去t2表的索引上去查询，我们知道在NLJ算法中并没有用到join_buffer，所以join_buffer就可以充当临时内存。</p>
+<p><strong>BKA算法的核心思想就是借助join_buffer批量的从被驱动表的索引中查询数据。</strong></p>
+<p><strong>参考</strong></p>
+<p>极客时间 — 林晓斌（丁奇）：MySQL实战</p>
+
+          
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2020/05/03/【MySQL】MVVC机制/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1780,156 +1999,6 @@
 
 
     
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2018/12/16/【Spring】SpringMVC（一）：Web环境中的IoC容器启动过程/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="shan">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="SHAN">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2018/12/16/【Spring】SpringMVC（一）：Web环境中的IoC容器启动过程/" itemprop="url">SpringMVC（一）：Web环境中的IoC容器启动过程</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2018-12-16T15:33:00+08:00">
-                2018-12-16
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <p>在springmvc项目中，可以有多个容器，而且容器有上下层关系，此处的容器指的是spring容器，它是springmvc的父容器，springmvc容器将在下一章讲解。</p>
-<h4 id="WebApplicationContext"><a href="#WebApplicationContext" class="headerlink" title="WebApplicationContext"></a>WebApplicationContext</h4><p>web环境下spring默认使用的是WebApplicationContext，它是一个接口，看一下WebApplicationContext的定义：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">WebApplicationContext</span> <span class="keyword">extends</span> <span class="title">ApplicationContext</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 用于在ServletContext取根上下文</span></span><br><span class="line">    String ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE = WebApplicationContext.class.getName() + <span class="string">".ROOT"</span>;</span><br><span class="line">    String SCOPE_REQUEST = <span class="string">"request"</span>;</span><br><span class="line">    String SCOPE_SESSION = <span class="string">"session"</span>;</span><br><span class="line">    String SCOPE_APPLICATION = <span class="string">"application"</span>;</span><br><span class="line">    String SERVLET_CONTEXT_BEAN_NAME = <span class="string">"servletContext"</span>;</span><br><span class="line">    String CONTEXT_PARAMETERS_BEAN_NAME = <span class="string">"contextParameters"</span>;</span><br><span class="line">    String CONTEXT_ATTRIBUTES_BEAN_NAME = <span class="string">"contextAttributes"</span>;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 获取ServletContext</span></span><br><span class="line">    <span class="meta">@Nullable</span></span><br><span class="line">    <span class="function">ServletContext <span class="title">getServletContext</span><span class="params">()</span></span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>（1）WebApplicationContext接口本身中的内容并不多，可以看到它继承了ApplicationContext，有一个ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE成员变量，这个变量用于将IoC容器设置到ServletContext时的key，之后就可以从ServletContext中获取IoC容器。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">servletContext.setAttribute(WebApplicationConservletContexttext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, <span class="keyword">this</span>.context);</span><br></pre></td></tr></table></figure>
-<p>（2）既然WebApplicationContext只是一个接口，那么一定有一个它的实现类，作为IoC容器的实现，这个类就是XmlWebApplicationContext。</p>
-<h4 id="XmlWebApplicationContext"><a href="#XmlWebApplicationContext" class="headerlink" title="XmlWebApplicationContext"></a>XmlWebApplicationContext</h4><p>Spring使用XmlWebApplicationContext作为默认的WebApplicationContext容器实现，从继承关系中可以看到，XmlWebApplicationContext继承了WebApplicationContext,其实从名字上就可以看出，XmlWebApplicationContext也是ApplicationContext容器的实现，在ApplicationContext的基础之上，增加了对Web环境和XML配置定义的处理。</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">XmlWebApplicationContext</span> <span class="keyword">extends</span> <span class="title">AbstractRefreshableWebApplicationContext</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 默认的配置文件applicationContext.xml,在WEB-INF目录下</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEFAULT_CONFIG_LOCATION = <span class="string">"/WEB-INF/applicationContext.xml"</span>;</span><br><span class="line">    <span class="comment">// web项目的WEB-INF目录</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEFAULT_CONFIG_LOCATION_PREFIX = <span class="string">"/WEB-INF/"</span>;</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> String DEFAULT_CONFIG_LOCATION_SUFFIX = <span class="string">".xml"</span>;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">XmlWebApplicationContext</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 加载BeanDefinition的方法，在容器refresh()时启动</span></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">loadBeanDefinitions</span><span class="params">(DefaultListableBeanFactory beanFactory)</span> <span class="keyword">throws</span> BeansException, IOException </span>&#123;</span><br><span class="line">        <span class="comment">//  XmlBeanDefinitionReader对象，解析xml文件使用</span></span><br><span class="line">        XmlBeanDefinitionReader beanDefinitionReader = <span class="keyword">new</span> XmlBeanDefinitionReader(beanFactory);</span><br><span class="line">        beanDefinitionReader.setEnvironment(<span class="keyword">this</span>.getEnvironment());</span><br><span class="line">        <span class="comment">// 设置ResourceLoader，XmlWebApplicationContext是DefaultResource的子类，同样使用DefaultResourceLoader对资源文件定位</span></span><br><span class="line">        beanDefinitionReader.setResourceLoader(<span class="keyword">this</span>);</span><br><span class="line">        beanDefinitionReader.setEntityResolver(<span class="keyword">new</span> ResourceEntityResolver(<span class="keyword">this</span>));</span><br><span class="line">        <span class="keyword">this</span>.initBeanDefinitionReader(beanDefinitionReader);</span><br><span class="line">        <span class="comment">// 载入BeanDefinition</span></span><br><span class="line">        <span class="keyword">this</span>.loadBeanDefinitions(beanDefinitionReader);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">initBeanDefinitionReader</span><span class="params">(XmlBeanDefinitionReader beanDefinitionReader)</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">loadBeanDefinitions</span><span class="params">(XmlBeanDefinitionReader reader)</span> <span class="keyword">throws</span> IOException </span>&#123;</span><br><span class="line">        <span class="comment">// 获取资源文件的地址</span></span><br><span class="line">        String[] configLocations = <span class="keyword">this</span>.getConfigLocations();</span><br><span class="line">        <span class="keyword">if</span>(configLocations != <span class="keyword">null</span>) &#123;</span><br><span class="line">            String[] var3 = configLocations;</span><br><span class="line">            <span class="keyword">int</span> var4 = configLocations.length;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">for</span>(<span class="keyword">int</span> var5 = <span class="number">0</span>; var5 &lt; var4; ++var5) &#123;</span><br><span class="line">                String configLocation = var3[var5];</span><br><span class="line">                <span class="comment">// 根据资源文件的地址由XmlBeanDefinitionReader解析文件并载入BeanDefinition</span></span><br><span class="line">                reader.loadBeanDefinitions(configLocation);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 获取默认的配置</span></span><br><span class="line">    <span class="keyword">protected</span> String[] getDefaultConfigLocations() &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="keyword">this</span>.getNamespace() != <span class="keyword">null</span>?<span class="keyword">new</span> String[]&#123;<span class="string">"/WEB-INF/"</span> + <span class="keyword">this</span>.getNamespace() + <span class="string">".xml"</span>&#125;:<span class="keyword">new</span> String[]&#123;<span class="string">"/WEB-INF/applicationContext.xml"</span>&#125;;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>从XmlWebApplicationContext的启动过程来看，与IoC容器的初始化过程基本差不多，只不过在Web环境中，已经定义好了一个默认的配置文件，即WEB-INF/appicationContext.xml，下面看一下如何进入到XmlWebApplicationContext的loadBeanDefinitions方法中的。</p>
-<h4 id="ContextLoaderListener"><a href="#ContextLoaderListener" class="headerlink" title="ContextLoaderListener"></a>ContextLoaderListener</h4><p>ContextLoaderListener是Web容器中配置的监听器，WebApplicationContext容器的载入就是它负责的。<br><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ContextLoaderListener</span> <span class="keyword">extends</span> <span class="title">ContextLoader</span> <span class="keyword">implements</span> <span class="title">ServletContextListener</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">ContextLoaderListener</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">ContextLoaderListener</span><span class="params">(WebApplicationContext context)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>(context);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">contextInitialized</span><span class="params">(ServletContextEvent event)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 初始化WebApplicationContext，具体的工作在ContextLoader中完成</span></span><br><span class="line">        <span class="keyword">this</span>.initWebApplicationContext(event.getServletContext());</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">contextDestroyed</span><span class="params">(ServletContextEvent event)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 销毁WebApplicationContext</span></span><br><span class="line">        <span class="keyword">this</span>.closeWebApplicationContext(event.getServletContext());</span><br><span class="line">        ContextCleanupListener.cleanupAttributes(event.getServletContext());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
-<p>ContextLoaderListener的contextInitialized方法中调用了initWebApplicationContext方法初始化web容器，该方法是在它的父类ContextLoader中实现的。</p>
-<h4 id="ContextLoader"><a href="#ContextLoader" class="headerlink" title="ContextLoader"></a>ContextLoader</h4><figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">ContextLoader</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Web IoC容器，也称作根上下文</span></span><br><span class="line">    <span class="meta">@Nullable</span></span><br><span class="line">    <span class="keyword">private</span> WebApplicationContext context;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">public</span> WebApplicationContext <span class="title">initWebApplicationContext</span><span class="params">(ServletContext servletContext)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 判断根上下文是否已经存在</span></span><br><span class="line">        <span class="keyword">if</span>(servletContext.getAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE) != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> IllegalStateException(<span class="string">"Cannot initialize context because there is already a root application context present - check whether you have multiple ContextLoader* definitions in your web.xml!"</span>);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            Log logger = LogFactory.getLog(ContextLoader.class);</span><br><span class="line">            servletContext.log(<span class="string">"Initializing Spring root WebApplicationContext"</span>);</span><br><span class="line">            <span class="keyword">if</span>(logger.isInfoEnabled()) &#123;</span><br><span class="line">                logger.info(<span class="string">"Root WebApplicationContext: initialization started"</span>);</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="keyword">long</span> startTime = System.currentTimeMillis();</span><br><span class="line"></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="keyword">if</span>(<span class="keyword">this</span>.context == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    <span class="comment">// 创建容器WebApplicationContext</span></span><br><span class="line">                    <span class="keyword">this</span>.context = <span class="keyword">this</span>.createWebApplicationContext(servletContext);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">//如果容器是ConfigurableWebApplicationContext的一个实现</span></span><br><span class="line">                <span class="keyword">if</span>(<span class="keyword">this</span>.context <span class="keyword">instanceof</span> ConfigurableWebApplicationContext) &#123;</span><br><span class="line">                    ConfigurableWebApplicationContext cwac = (ConfigurableWebApplicationContext)<span class="keyword">this</span>.context;</span><br><span class="line">                    <span class="keyword">if</span>(!cwac.isActive()) &#123;</span><br><span class="line">                        <span class="comment">// 如果双亲为空</span></span><br><span class="line">                        <span class="keyword">if</span>(cwac.getParent() == <span class="keyword">null</span>) &#123;</span><br><span class="line">                            <span class="comment">// 加载根上下文的双亲上下文</span></span><br><span class="line">                            ApplicationContext parent = <span class="keyword">this</span>.loadParentContext(servletContext);</span><br><span class="line">                            cwac.setParent(parent);</span><br><span class="line">                        &#125;</span><br><span class="line">                        <span class="comment">// 配置并refresh根上下文</span></span><br><span class="line">                        <span class="keyword">this</span>.configureAndRefreshWebApplicationContext(cwac, servletContext);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">// 将当前创建的web IoC容器context设置为servletContext的根上下文</span></span><br><span class="line">                servletContext.setAttribute(WebApplicationConservletContexttext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, <span class="keyword">this</span>.context);</span><br><span class="line">                ClassLoader ccl = Thread.currentThread().getContextClassLoader();</span><br><span class="line">                <span class="keyword">if</span>(ccl == ContextLoader.class.getClassLoader()) &#123;</span><br><span class="line">                    currentContext = <span class="keyword">this</span>.context;</span><br><span class="line">                &#125; <span class="keyword">else</span> <span class="keyword">if</span>(ccl != <span class="keyword">null</span>) &#123;</span><br><span class="line">                    currentContextPerThread.put(ccl, <span class="keyword">this</span>.context);</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span>(logger.isDebugEnabled()) &#123;</span><br><span class="line">                    logger.debug(<span class="string">"Published root WebApplicationContext as ServletContext attribute with name ["</span> + WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE + <span class="string">"]"</span>);</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span>(logger.isInfoEnabled()) &#123;</span><br><span class="line">                    <span class="keyword">long</span> elapsedTime = System.currentTimeMillis() - startTime;</span><br><span class="line">                    logger.info(<span class="string">"Root WebApplicationContext: initialization completed in "</span> + elapsedTime + <span class="string">" ms"</span>);</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">return</span> <span class="keyword">this</span>.context;</span><br><span class="line">            &#125; <span class="keyword">catch</span> (RuntimeException var8) &#123;</span><br><span class="line">                logger.error(<span class="string">"Context initialization failed"</span>, var8);</span><br><span class="line">                servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, var8);</span><br><span class="line">                <span class="keyword">throw</span> var8;</span><br><span class="line">            &#125; <span class="keyword">catch</span> (Error var9) &#123;</span><br><span class="line">                logger.error(<span class="string">"Context initialization failed"</span>, var9);</span><br><span class="line">                servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, var9);</span><br><span class="line">                <span class="keyword">throw</span> var9;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">   <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 创建web容器的地方</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> WebApplicationContext <span class="title">createWebApplicationContext</span><span class="params">(ServletContext sc)</span> </span>&#123;</span><br><span class="line">        <span class="comment">// 判断使用什么样的类作为Web环境中的IoC容器</span></span><br><span class="line">        Class&lt;?&gt; contextClass = <span class="keyword">this</span>.determineContextClass(sc);</span><br><span class="line">        <span class="keyword">if</span>(!ConfigurableWebApplicationContext.class.isAssignableFrom(contextClass)) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(<span class="string">"Custom context class ["</span> + contextClass.getName() + <span class="string">"] is not of type ["</span> + ConfigurableWebApplicationContext.class.getName() + <span class="string">"]"</span>);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">// 根据类信息实例化web IoC容器</span></span><br><span class="line">            <span class="keyword">return</span> (ConfigurableWebApplicationContext)BeanUtils.instantiateClass(contextClass);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">   <span class="comment">/**</span></span><br><span class="line"><span class="comment">    * 判断使用哪种web容器</span></span><br><span class="line"><span class="comment">    */</span></span><br><span class="line">    <span class="keyword">protected</span> Class&lt;?&gt; determineContextClass(ServletContext servletContext) &#123;</span><br><span class="line">        <span class="comment">// 读取在ServletContext中对contextClass参数的配置</span></span><br><span class="line">        String contextClassName = servletContext.getInitParameter(<span class="string">"contextClass"</span>);</span><br><span class="line">        <span class="comment">// 如果在ServletContext中对contextClass参数配置不为空</span></span><br><span class="line">        <span class="keyword">if</span>(contextClassName != <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="comment">// 返回类信息</span></span><br><span class="line">                <span class="keyword">return</span> ClassUtils.forName(contextClassName, ClassUtils.getDefaultClassLoader());</span><br><span class="line">            &#125; <span class="keyword">catch</span> (ClassNotFoundException var4) &#123;</span><br><span class="line">                <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(<span class="string">"Failed to load custom context class ["</span> + contextClassName + <span class="string">"]"</span>, var4);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">// 如果配置信息为空，使用默认的WebApplicationContext</span></span><br><span class="line">            contextClassName = defaultStrategies.getProperty(WebApplicationContext.class.getName());</span><br><span class="line"></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> ClassUtils.forName(contextClassName, ContextLoader.class.getClassLoader());</span><br><span class="line">            &#125; <span class="keyword">catch</span> (ClassNotFoundException var5) &#123;</span><br><span class="line">                <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(<span class="string">"Failed to load default context class ["</span> + contextClassName + <span class="string">"]"</span>, var5);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 配置并refresh，这个方法中调用了容器的refresh方法来完成Web环境下IoC容器的初始化</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">configureAndRefreshWebApplicationContext</span><span class="params">(ConfigurableWebApplicationContext wac, ServletContext sc)</span> </span>&#123;</span><br><span class="line">        String configLocationParam;</span><br><span class="line">        <span class="keyword">if</span>(ObjectUtils.identityToString(wac).equals(wac.getId())) &#123;</span><br><span class="line">            configLocationParam = sc.getInitParameter(<span class="string">"contextId"</span>);</span><br><span class="line">            <span class="keyword">if</span>(configLocationParam != <span class="keyword">null</span>) &#123;</span><br><span class="line">                wac.setId(configLocationParam);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                wac.setId(ConfigurableWebApplicationContext.APPLICATION_CONTEXT_ID_PREFIX + ObjectUtils.getDisplayString(sc.getContextPath()));</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 为容器设置ServletContext</span></span><br><span class="line">        wac.setServletContext(sc);</span><br><span class="line">        configLocationParam = sc.getInitParameter(<span class="string">"contextConfigLocation"</span>);</span><br><span class="line">        <span class="keyword">if</span>(configLocationParam != <span class="keyword">null</span>) &#123;</span><br><span class="line">            wac.setConfigLocation(configLocationParam);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        ConfigurableEnvironment env = wac.getEnvironment();</span><br><span class="line">        <span class="keyword">if</span>(env <span class="keyword">instanceof</span> ConfigurableWebEnvironment) &#123;</span><br><span class="line">            ((ConfigurableWebEnvironment)env).initPropertySources(sc, (ServletConfig)<span class="keyword">null</span>);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">this</span>.customizeContext(sc, wac);</span><br><span class="line">        <span class="comment">// 调用容器的refresh方法，完成容器的初始化</span></span><br><span class="line">        wac.refresh();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<ol>
-<li><p>在ContextLoader类中，存在一个WebApplicationContext类型的字段context, 这个变量就是Web环境中的IoC容器，也会配置在ServletContext的根上下文中，ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE为属性名，已经在WebApplication中定义为了一个常量。</p>
-</li>
-<li><p>initWebApplicationContext方法，是启动IoC容器的入口：</p>
-<p> （1）如果容器还没有创建，会调用createWebApplicationContext方法创建IoC容器，在该方法中，会调用determineContextClass方法判断使用哪种IoC容器，如果没有设置contextClass参数，就使用默认的容器即WebApplicationContext。</p>
-<p> （2）接着会判断创建的容器是否是ConfigurableWebApplicationContext的实例，如果是，将设置双亲上下文，并调用configureAndRefreshWebApplicationContext方法，将当前的serveltContext设置到Ioc容器中，最后调用容器的<strong>refresh()</strong>方法，完成容器的初始化。</p>
-<p> （3）最后会把容器设置到ServletContext的根上下文中，并将容器返回。</p>
-</li>
-</ol>
-<h4 id="AbstractApplicationContext"><a href="#AbstractApplicationContext" class="headerlink" title="AbstractApplicationContext"></a>AbstractApplicationContext</h4><p> 再回顾一下XmlWebApplicationContext的继承关系，它继承了AbstractRefreshableApplicationContext,AbstractRefreshableApplicationContext又继承了AbstractApplicationContext方法，refresh方法就是在AbstractApplicationContext实现的，之后的流程就和IoC容器启动过程一样了。</p>
-<p> AbstractApplicationContext中的refresh()方法：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">AbstractApplicationContext</span> <span class="keyword">extends</span> <span class="title">DefaultResourceLoader</span> <span class="keyword">implements</span> <span class="title">ConfigurableApplicationContext</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">refresh</span><span class="params">()</span> <span class="keyword">throws</span> BeansException, IllegalStateException </span>&#123;</span><br><span class="line">        Object var1 = <span class="keyword">this</span>.startupShutdownMonitor;</span><br><span class="line">        <span class="keyword">synchronized</span>(<span class="keyword">this</span>.startupShutdownMonitor) &#123;</span><br><span class="line">            <span class="keyword">this</span>.prepareRefresh();</span><br><span class="line">            ConfigurableListableBeanFactory beanFactory = <span class="keyword">this</span>.obtainFreshBeanFactory();</span><br><span class="line">            <span class="comment">// 调用AbstractRefreshableApplicationContext的prepareBeanFactory方法</span></span><br><span class="line">            <span class="keyword">this</span>.prepareBeanFactory(beanFactory);</span><br><span class="line"></span><br><span class="line">            <span class="keyword">try</span> &#123;</span><br><span class="line">                <span class="keyword">this</span>.postProcessBeanFactory(beanFactory);</span><br><span class="line">                <span class="keyword">this</span>.invokeBeanFactoryPostProcessors(beanFactory);</span><br><span class="line">                <span class="keyword">this</span>.registerBeanPostProcessors(beanFactory);</span><br><span class="line">                <span class="keyword">this</span>.initMessageSource();</span><br><span class="line">                <span class="keyword">this</span>.initApplicationEventMulticaster();</span><br><span class="line">                <span class="keyword">this</span>.onRefresh();</span><br><span class="line">                <span class="keyword">this</span>.registerListeners();</span><br><span class="line">                <span class="keyword">this</span>.finishBeanFactoryInitialization(beanFactory);</span><br><span class="line">                <span class="keyword">this</span>.finishRefresh();</span><br><span class="line">            &#125; <span class="keyword">catch</span> (BeansException var9) &#123;</span><br><span class="line">                <span class="keyword">if</span>(<span class="keyword">this</span>.logger.isWarnEnabled()) &#123;</span><br><span class="line">                    <span class="keyword">this</span>.logger.warn(<span class="string">"Exception encountered during context initialization - cancelling refresh attempt: "</span> + var9);</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">this</span>.destroyBeans();</span><br><span class="line">                <span class="keyword">this</span>.cancelRefresh(var9);</span><br><span class="line">                <span class="keyword">throw</span> var9;</span><br><span class="line">            &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">                <span class="keyword">this</span>.resetCommonCaches();</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h4 id="AbstractRefreshableApplicationContext"><a href="#AbstractRefreshableApplicationContext" class="headerlink" title="AbstractRefreshableApplicationContext"></a>AbstractRefreshableApplicationContext</h4><p> refresh方法中调用了调用AbstractRefreshableApplicationContext的prepareBeanFactory方法，在该方法中对BeanDefinition进行了载入：</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"> <span class="keyword">public</span> <span class="keyword">abstract</span> <span class="class"><span class="keyword">class</span> <span class="title">AbstractRefreshableApplicationContext</span> <span class="keyword">extends</span> <span class="title">AbstractApplicationContext</span> </span>&#123;</span><br><span class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">refreshBeanFactory</span><span class="params">()</span> <span class="keyword">throws</span> BeansException </span>&#123;</span><br><span class="line">        <span class="keyword">if</span>(<span class="keyword">this</span>.hasBeanFactory()) &#123;</span><br><span class="line">            <span class="keyword">this</span>.destroyBeans();</span><br><span class="line">            <span class="keyword">this</span>.closeBeanFactory();</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            DefaultListableBeanFactory beanFactory = <span class="keyword">this</span>.createBeanFactory();</span><br><span class="line">            beanFactory.setSerializationId(<span class="keyword">this</span>.getId());</span><br><span class="line">            <span class="keyword">this</span>.customizeBeanFactory(beanFactory);</span><br><span class="line">            <span class="comment">// 载入BeanDefinition</span></span><br><span class="line">            <span class="keyword">this</span>.loadBeanDefinitions(beanFactory);</span><br><span class="line">            Object var2 = <span class="keyword">this</span>.beanFactoryMonitor;</span><br><span class="line">            <span class="keyword">synchronized</span>(<span class="keyword">this</span>.beanFactoryMonitor) &#123;</span><br><span class="line">                <span class="keyword">this</span>.beanFactory = beanFactory;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (IOException var5) &#123;</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> ApplicationContextException(<span class="string">"I/O error parsing bean definition source for "</span> + <span class="keyword">this</span>.getDisplayName(), var5);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>到此，如何进入到XmlWebApplicationContext的loadBeanDefinitions方法中的过程已经很明了了。</p>
-<p><strong>参考：</strong></p>
-<p>spring技术内幕:深入解析spring架构与设计原理</p>
-<p><a href="https://www.cnblogs.com/hafiz/p/5875740.html" target="_blank" rel="noopener">Spring和SpringMVC父子容器关系初窥</a></p>
-<p><strong>Spring版本:5.0.5</strong></p>
-
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
   </section>
 
   
@@ -1980,7 +2049,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">28</span>
+                  <span class="site-state-item-count">29</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
