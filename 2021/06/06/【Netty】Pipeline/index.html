@@ -90,10 +90,10 @@
 <meta property="og:image" content="http://yoursite.com/images/headContext.jpg">
 <meta property="og:image" content="http://yoursite.com/images/tailContext.jpg">
 <meta property="og:image" content="http://yoursite.com/images/inboundAdapter.jpg">
-<meta property="og:image" content="http://yoursite.com/outboundAdapter.jpg">
+<meta property="og:image" content="http://yoursite.com/images/outboundAdapter.jpg">
 <meta property="og:image" content="http://yoursite.com/images/defaultHandlerContext.jpg">
 <meta property="og:image" content="http://yoursite.com/images/pipeline.png">
-<meta property="og:updated_time" content="2021-06-06T03:57:48.615Z">
+<meta property="og:updated_time" content="2021-06-06T04:03:31.871Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="【Netty】Pipeline">
 <meta name="twitter:description" content="Pipeline的初始化ChannelPipeline是一个双向链表，在Channel构建的过程中，创建了ChannelPipeline，初始化了头结点head和尾节点tail： 1234567891011121314151617181920212223242526272829303132public abstract class AbstractChannel extends DefaultAt">
@@ -321,7 +321,7 @@
 <p><strong>ChannelInboundHandler</strong></p>
 <p><img src="/images/inboundAdapter.jpg" alt=""></p>
 <p><strong>ChannelOutboundHandler</strong></p>
-<p><img src="/outboundAdapter.jpg" alt=""></p>
+<p><img src="/images/outboundAdapter.jpg" alt=""></p>
 <p>ChannelInboundHandler和ChannelOutboundHandler都是ChannelHandler的子类。</p>
 <p>ChannelInboundHandler是入站处理器，如果以服务端为角度，那么入站指的就是从客户端发送过来数据（数据流向从客户端到服务端），触发从头结点HeadContext开始事件传播，一直到尾节点TailContext结束。</p>
 <p>ChannelOutboundHandler是出站处理器，与ChannelInboundHandler相反，同样以服务器为角度，数据流向从服务端到客户端就是出站，它会从TailContext开始，一直到HeadContext结束。</p>
@@ -415,6 +415,10 @@
 
           <div class="post-nav-prev post-nav-item">
             
+              <a href="/2021/07/31/【Redis】简单动态字符串SDS/" rel="prev" title="简单动态字符串SDS">
+                简单动态字符串SDS <i class="fa fa-chevron-right"></i>
+              </a>
+            
           </div>
         </div>
       
@@ -490,7 +494,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">29</span>
+                  <span class="site-state-item-count">30</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
