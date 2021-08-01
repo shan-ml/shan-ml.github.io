@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Redis 字典基本语法字典是Redis中的一种数据结构，底层使用哈希表实现，一个哈希表中可以存储多个键值对，它的语法如下，其中KEY为键，field和value为值（也是一个键值对）： 1HSET key field value 根据Key和field获取value： 1HGET key field 哈希表数据结构dicthtdictht是哈希表的数据结构定义：  table：哈希表数组，数组中">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】简单动态字符串SDS">
+<meta property="og:url" content="http://yoursite.com/2021/08/01/【Redis】字典/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="Redis 字典基本语法字典是Redis中的一种数据结构，底层使用哈希表实现，一个哈希表中可以存储多个键值对，它的语法如下，其中KEY为键，field和value为值（也是一个键值对）： 1HSET key field value 根据Key和field获取value： 1HGET key field 哈希表数据结构dicthtdictht是哈希表的数据结构定义：  table：哈希表数组，数组中">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/images/dictht.jpg">
+<meta property="og:image" content="http://yoursite.com/images/redis哈希表.jpg">
+<meta property="og:image" content="http://yoursite.com/images/redis字典.jpg">
+<meta property="og:image" content="http://yoursite.com/images/hash冲突.jpg">
+<meta property="og:updated_time" content="2021-08-01T15:59:57.936Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】简单动态字符串SDS">
+<meta name="twitter:description" content="Redis 字典基本语法字典是Redis中的一种数据结构，底层使用哈希表实现，一个哈希表中可以存储多个键值对，它的语法如下，其中KEY为键，field和value为值（也是一个键值对）： 1HSET key field value 根据Key和field获取value： 1HGET key field 哈希表数据结构dicthtdictht是哈希表的数据结构定义：  table：哈希表数组，数组中">
+<meta name="twitter:image" content="http://yoursite.com/images/dictht.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2021/08/01/【Redis】字典/"/>
+
+
+
+
+
+  <title>【Redis】简单动态字符串SDS | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/08/01/【Redis】字典/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】简单动态字符串SDS</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-08-01T23:30:00+08:00">
+                2021-08-01
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="Redis-字典"><a href="#Redis-字典" class="headerlink" title="Redis 字典"></a>Redis 字典</h2><h3 id="基本语法"><a href="#基本语法" class="headerlink" title="基本语法"></a>基本语法</h3><p>字典是Redis中的一种数据结构，底层使用哈希表实现，一个哈希表中可以存储多个键值对，它的语法如下，其中KEY为键，field和value为值（也是一个键值对）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">HSET key field value</span><br></pre></td></tr></table></figure>
+<p>根据Key和field获取value：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">HGET key field</span><br></pre></td></tr></table></figure>
+<h3 id="哈希表"><a href="#哈希表" class="headerlink" title="哈希表"></a>哈希表</h3><h4 id="数据结构"><a href="#数据结构" class="headerlink" title="数据结构"></a>数据结构</h4><h5 id="dictht"><a href="#dictht" class="headerlink" title="dictht"></a>dictht</h5><p>dictht是哈希表的数据结构定义：</p>
+<ul>
+<li>table：哈希表数组，数组中的元素是dictEntry类型的</li>
+<li>size：哈希表数组的大小</li>
+<li>sizemask：哈希表大小掩码，一般等于size-1</li>
+<li>used：已有节点的数量（存储键值对的数量）</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">dictht</span> &#123;</span></span><br><span class="line">    dictEntry **table;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> size;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> sizemask;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> used;</span><br><span class="line">&#125; dictht;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/dictht.jpg" alt=""></p>
+<h5 id="dictEntry"><a href="#dictEntry" class="headerlink" title="dictEntry"></a>dictEntry</h5><p>dictEntry是哈希表节点的结构定义：</p>
+<ul>
+<li>key：键值对中的键</li>
+<li>v：键值对中的值</li>
+<li>next：由于会出现哈希冲突，所以next是指向下一个节点的指针</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">dictEntry</span> &#123;</span></span><br><span class="line">    <span class="keyword">void</span> *key; <span class="comment">// 键</span></span><br><span class="line">    <span class="keyword">union</span> &#123;</span><br><span class="line">        <span class="keyword">void</span> *val;</span><br><span class="line">        <span class="keyword">uint64_t</span> u64;</span><br><span class="line">        <span class="keyword">int64_t</span> s64;</span><br><span class="line">        <span class="keyword">double</span> d;</span><br><span class="line">    &#125; v; <span class="comment">// 值</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">dictEntry</span> *<span class="title">next</span>;</span> <span class="comment">// 指向下一个节点的指针</span></span><br><span class="line">&#125; dictEntry;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/redis哈希表.jpg" alt=""></p>
+<h5 id="dict"><a href="#dict" class="headerlink" title="dict"></a>dict</h5><p>dict是Redis中字典的结构定义：</p>
+<ul>
+<li>type：指向dictType的指针</li>
+<li>privdata</li>
+<li>ht[2]：一个dictht类型的数组，数组大小为2，保存了两个哈希表，rehash时使用</li>
+<li>rehashidx：记录了当前rehash的进度</li>
+<li>pauserehash：rehash暂停标记，大于0表示没有进行rehash</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">dict</span> &#123;</span></span><br><span class="line">    dictType *type; <span class="comment">// </span></span><br><span class="line">    <span class="keyword">void</span> *privdata; <span class="comment">// 私有数据</span></span><br><span class="line">    dictht ht[<span class="number">2</span>]; <span class="comment">// 保存了两个哈希表</span></span><br><span class="line">    <span class="keyword">long</span> rehashidx; <span class="comment">// rehash的进度标记</span></span><br><span class="line">    <span class="keyword">int16_t</span> pauserehash; </span><br><span class="line">&#125; dict;</span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">dictType</span> &#123;</span></span><br><span class="line">    <span class="keyword">uint64_t</span> (*hashFunction)(<span class="keyword">const</span> <span class="keyword">void</span> *key);</span><br><span class="line">    <span class="keyword">void</span> *(*keyDup)(<span class="keyword">void</span> *privdata, <span class="keyword">const</span> <span class="keyword">void</span> *key);</span><br><span class="line">    <span class="keyword">void</span> *(*valDup)(<span class="keyword">void</span> *privdata, <span class="keyword">const</span> <span class="keyword">void</span> *obj);</span><br><span class="line">    <span class="keyword">int</span> (*keyCompare)(<span class="keyword">void</span> *privdata, <span class="keyword">const</span> <span class="keyword">void</span> *key1, <span class="keyword">const</span> <span class="keyword">void</span> *key2);</span><br><span class="line">    <span class="keyword">void</span> (*keyDestructor)(<span class="keyword">void</span> *privdata, <span class="keyword">void</span> *key);</span><br><span class="line">    <span class="keyword">void</span> (*valDestructor)(<span class="keyword">void</span> *privdata, <span class="keyword">void</span> *obj);</span><br><span class="line">    <span class="keyword">int</span> (*expandAllowed)(<span class="keyword">size_t</span> moreMem, <span class="keyword">double</span> usedRatio);</span><br><span class="line">&#125; dictType;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/redis字典.jpg" alt=""></p>
+<h4 id="哈希冲突"><a href="#哈希冲突" class="headerlink" title="哈希冲突"></a>哈希冲突</h4><p>一个键值对放入哈希表的时候，会根据key的值，计算一个hash值，然后根据hash值与哈希表大小掩码做与运算得到一个索引值，索引值决定元素放入哪个哈希桶中（落入哈希表数组哪个索引位置处）。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 计算hash值</span></span><br><span class="line">hash = dictHashKey(d,key)</span><br><span class="line"><span class="comment">// 计算索引</span></span><br><span class="line">idx = hash &amp; d-&gt;ht[table].sizemask;</span><br></pre></td></tr></table></figure>
+<p>在进行哈希计算的时候，不可避免会出现哈希冲突，出现哈希冲突的时候，Redis采用<strong>链式哈希</strong>解决冲突，也就是落入同一个桶中的元素，使用链表将这些冲突的元素链起来（dictEntry中的next指针）。</p>
+<p><img src="/images/hash冲突.jpg" alt=""></p>
+<h4 id="rehash"><a href="#rehash" class="headerlink" title="rehash"></a>rehash</h4><p>由于Redis采用<strong>链式哈希</strong>解决冲突，那么在冲突频繁的场景下，链表会变得越来越长，这种情况下查找效率是比较低下的，需要遍历链表对比KEY的值来获取数据，为了处理效率低下的问题，需要对哈希表进行扩容，扩容的过程称为rehash。</p>
+<p>在dict结构替中ht保存了两个哈希表，ht[0]用于数据正常的增删改查，ht[1]用于rehash：</p>
+<p>（1）正常情况下，所有的增删改查操作都在ht[0]中进行；</p>
+<p>（2）需要进行rehash时，会使用ht[1]建立新的哈希表，并将ht[0]中的数据迁移到ht[1]中；</p>
+<p>（3）迁移完成后，ht[0]的空间被释放，然后将ht[1]地址赋给ht[0]，ht[1]的大小被设为0，ht[0]重新接收正常的请求，回到了第（1）步的状态；</p>
+<h5 id="rehash的触发条件"><a href="#rehash的触发条件" class="headerlink" title="rehash的触发条件"></a>rehash的触发条件</h5><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 判断是否需要扩容 */</span></span><br><span class="line"><span class="keyword">static</span> <span class="keyword">int</span> _dictExpandIfNeeded(dict *d)</span><br><span class="line">&#123;</span><br><span class="line">    <span class="comment">/* 如果已经处于rehash状态中直接返回 */</span></span><br><span class="line">    <span class="keyword">if</span> (dictIsRehashing(d)) <span class="keyword">return</span> DICT_OK;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果ht[0]的大小为0，意味着哈希表为空，此时做初始化操作 */</span></span><br><span class="line">    <span class="keyword">if</span> (d-&gt;ht[<span class="number">0</span>].size == <span class="number">0</span>) <span class="keyword">return</span> dictExpand(d, DICT_HT_INITIAL_SIZE);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/*如果已经存储的节点数量大于或等于哈希表数组的大小，并且跨域扩容或者（节点数量/哈希表数组大小）大于一个比例，同时根据字典的类型判断是否允许分配内存*/</span></span><br><span class="line">    <span class="keyword">if</span> (d-&gt;ht[<span class="number">0</span>].used &gt;= d-&gt;ht[<span class="number">0</span>].size &amp;&amp;</span><br><span class="line">        (dict_can_resize ||</span><br><span class="line">         d-&gt;ht[<span class="number">0</span>].used/d-&gt;ht[<span class="number">0</span>].size &gt; dict_force_resize_ratio) &amp;&amp;</span><br><span class="line">        dictTypeExpandAllowed(d))</span><br><span class="line">    &#123;   </span><br><span class="line">        <span class="comment">// 进行扩容</span></span><br><span class="line">        <span class="keyword">return</span> dictExpand(d, d-&gt;ht[<span class="number">0</span>].used + <span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> DICT_OK;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 由于扩容需要分配内存，这里检查字典类型分配是否被允许*/</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">dictTypeExpandAllowed</span><span class="params">(dict *d)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (d-&gt;type-&gt;expandAllowed == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">return</span> d-&gt;type-&gt;expandAllowed(</span><br><span class="line">                    _dictNextPower(d-&gt;ht[<span class="number">0</span>].used + <span class="number">1</span>) * <span class="keyword">sizeof</span>(dictEntry*),</span><br><span class="line">                    (<span class="keyword">double</span>)d-&gt;ht[<span class="number">0</span>].used / d-&gt;ht[<span class="number">0</span>].size);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>d-&gt;ht[0].used/d-&gt;ht[0].size : 节点数量与哈希表数组大小的比例，称作<strong>负载因子</strong>。</p>
+<p>dict_force_resize_ratio 的默认值是 5。</p>
+</blockquote>
+<ol>
+<li>ht[0]的大小为0，此时哈希表是空的，相当于对哈希表做一个初始化的操作。</li>
+<li>如果哈希表中存储的节点数量大于或者等于哈希表数组的大小，并且哈希表可以扩容或者负载因子大于dict_force_resize_ratio（默认值为5），根据字典的类型判断允许分配内存，满足这三个条件开始扩容。</li>
+</ol>
+<p><strong>dict_can_resize</strong></p>
+<p>dict_can_resize用来判断哈希表是否可以扩容，有两种状态，值分别为1和0，1代表可以扩容，0代表禁用扩容：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">dictEnableResize</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    dict_can_resize = <span class="number">1</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">dictDisableResize</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    dict_can_resize = <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>updateDictResizePolicy中对dict_can_resize的状态进行了控制，当前没有RDB子进程并且也没有AOF子进程时设置dict_can_resize状态为可扩容：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">updateDictResizePolicy</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 没有RDB子进程并且也没有AOF子进程</span></span><br><span class="line">    <span class="keyword">if</span> (server.rdb_child_pid == <span class="number">-1</span> &amp;&amp; server.aof_child_pid == <span class="number">-1</span>)</span><br><span class="line">        dictEnableResize(); <span class="comment">// 启用扩容</span></span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        dictDisableResize(); <span class="comment">// 禁用扩容</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h5 id="扩容大小"><a href="#扩容大小" class="headerlink" title="扩容大小"></a>扩容大小</h5><p>从代码中可以看到，扩容后哈希表数组的大小为已经存储的节点数量+1：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 进行扩容</span></span><br><span class="line"><span class="keyword">return</span> dictExpand(d, d-&gt;ht[<span class="number">0</span>].used + <span class="number">1</span>);</span><br></pre></td></tr></table></figure>
+<p>一些旧版本中扩容后的大小为已存储节点数量的2倍：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dictExpand(d, d-&gt;ht[<span class="number">0</span>].used*<span class="number">2</span>);</span><br></pre></td></tr></table></figure>
+<h4 id="渐进式hash"><a href="#渐进式hash" class="headerlink" title="渐进式hash"></a>渐进式hash</h4><p>当哈希表存储节点内容比较多时，需要将原来的节点一个一个拷贝到新的哈希表中，此时Redis主线程无法执行其他请求，造成阻塞，影响性能，为了解决这个问题，引入了渐进式hash。</p>
+<p>渐进式hash并不会一次把旧节点全部拷贝到新的哈希表中，而是分多次渐进式的完成拷贝，其中rehashidx记录了迁移进度，每一次迁移的过程中会更新rehashidx的值，下一次进行数据迁移的时候，从rehashidx的位置开始迁移，在dictRehash中可以看到迁移的处理：</p>
+<ol>
+<li>方法传入了一个参数n，代表本次需要迁移几个哈希桶</li>
+<li>根据需要迁移哈希桶的数量，循环处理每一个哈希桶：<ul>
+<li>如果当前哈希桶中为空，继续下一个桶的处理rehashidx++</li>
+<li>如果当前哈希桶不为空，将当前桶中的所有节点迁移到新的哈希表中，然后更新rehashidx的值继续处理下一个桶</li>
+</ul>
+</li>
+<li>如果已经处理够了n个桶，或者哈希表的所有数据已经迁移完毕，则结束迁移。</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">dictRehash</span><span class="params">(dict *d, <span class="keyword">int</span> n)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> empty_visits = n*<span class="number">10</span>; <span class="comment">/* Max number of empty buckets to visit. */</span></span><br><span class="line">    <span class="keyword">if</span> (!dictIsRehashing(d)) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 循环处理每一个哈希桶，n为需要迁移哈希桶的数量</span></span><br><span class="line">    <span class="keyword">while</span>(n-- &amp;&amp; d-&gt;ht[<span class="number">0</span>].used != <span class="number">0</span>) &#123;</span><br><span class="line">        dictEntry *de, *nextde;</span><br><span class="line">        assert(d-&gt;ht[<span class="number">0</span>].size &gt; (<span class="keyword">unsigned</span> <span class="keyword">long</span>)d-&gt;rehashidx);</span><br><span class="line">        <span class="comment">// 如果当前哈希桶没有存储数据</span></span><br><span class="line">        <span class="keyword">while</span>(d-&gt;ht[<span class="number">0</span>].table[d-&gt;rehashidx] == <span class="literal">NULL</span>) &#123;</span><br><span class="line">            <span class="comment">// rehashidx的值是哈希表数组的某个索引值（指向了某个哈希桶），意味着当前迁移到数组的哪个索引位置处</span></span><br><span class="line">            d-&gt;rehashidx++; <span class="comment">// 继续下一个桶</span></span><br><span class="line">            <span class="keyword">if</span> (--empty_visits == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">       </span><br><span class="line">        de = d-&gt;ht[<span class="number">0</span>].table[d-&gt;rehashidx];</span><br><span class="line">        <span class="comment">// 如果当前的哈希桶中存储着数据，将哈希桶存储的所有数据迁移到新的哈希表中</span></span><br><span class="line">        <span class="keyword">while</span>(de) &#123;</span><br><span class="line">            <span class="keyword">uint64_t</span> h;</span><br><span class="line"></span><br><span class="line">            nextde = de-&gt;next;</span><br><span class="line">            <span class="comment">/* Get the index in the new hash table */</span></span><br><span class="line">            h = dictHashKey(d, de-&gt;key) &amp; d-&gt;ht[<span class="number">1</span>].sizemask;</span><br><span class="line">            de-&gt;next = d-&gt;ht[<span class="number">1</span>].table[h];</span><br><span class="line">            d-&gt;ht[<span class="number">1</span>].table[h] = de;</span><br><span class="line">            d-&gt;ht[<span class="number">0</span>].used--;</span><br><span class="line">            d-&gt;ht[<span class="number">1</span>].used++;</span><br><span class="line">            de = nextde;</span><br><span class="line">        &#125;</span><br><span class="line">        d-&gt;ht[<span class="number">0</span>].table[d-&gt;rehashidx] = <span class="literal">NULL</span>;</span><br><span class="line">        <span class="comment">// rehashidx，继续迁移下一个哈希桶</span></span><br><span class="line">        d-&gt;rehashidx++;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 判断ht[0]的节点是否迁移完成 */</span></span><br><span class="line">    <span class="keyword">if</span> (d-&gt;ht[<span class="number">0</span>].used == <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="comment">// 释放ht[0]的空间</span></span><br><span class="line">        zfree(d-&gt;ht[<span class="number">0</span>].table);</span><br><span class="line">        <span class="comment">// 将ht[0]指向ht[1]</span></span><br><span class="line">        d-&gt;ht[<span class="number">0</span>] = d-&gt;ht[<span class="number">1</span>];</span><br><span class="line">        <span class="comment">// 重置ht[1]的大小为0</span></span><br><span class="line">        _dictReset(&amp;d-&gt;ht[<span class="number">1</span>]);</span><br><span class="line">        <span class="comment">// 设置rehashidx，-1代表rehash结束</span></span><br><span class="line">        d-&gt;rehashidx = <span class="number">-1</span>;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* More to rehash... */</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>_dictRehashStep</strong></p>
+<p>_dictRehashStep中可以看到调用dictRehash时，每次迁移哈希桶的数量为1：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">void</span> _dictRehashStep(dict *d) &#123;</span><br><span class="line">    <span class="keyword">if</span> (d-&gt;pauserehash == <span class="number">0</span>) dictRehash(d,<span class="number">1</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>参考</strong></p>
+<p>黄健宏《Redis设计与实现》</p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
+<p><a href="https://tech.meituan.com/2018/07/27/redis-rehash-practice-optimization.html" target="_blank" rel="noopener">美团针对Redis Rehash机制的探索和实践</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/07/31/【Redis】简单动态字符串SDS/" rel="next" title="【Redis】简单动态字符串SDS">
+                <i class="fa fa-chevron-left"></i> 【Redis】简单动态字符串SDS
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">31</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">9</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-字典"><span class="nav-number">1.</span> <span class="nav-text">Redis 字典</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#基本语法"><span class="nav-number">1.1.</span> <span class="nav-text">基本语法</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#哈希表"><span class="nav-number">1.2.</span> <span class="nav-text">哈希表</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#数据结构"><span class="nav-number">1.2.1.</span> <span class="nav-text">数据结构</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#dictht"><span class="nav-number">1.2.1.1.</span> <span class="nav-text">dictht</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#dictEntry"><span class="nav-number">1.2.1.2.</span> <span class="nav-text">dictEntry</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#dict"><span class="nav-number">1.2.1.3.</span> <span class="nav-text">dict</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#哈希冲突"><span class="nav-number">1.2.2.</span> <span class="nav-text">哈希冲突</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#rehash"><span class="nav-number">1.2.3.</span> <span class="nav-text">rehash</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#rehash的触发条件"><span class="nav-number">1.2.3.1.</span> <span class="nav-text">rehash的触发条件</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#扩容大小"><span class="nav-number">1.2.3.2.</span> <span class="nav-text">扩容大小</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#渐进式hash"><span class="nav-number">1.2.4.</span> <span class="nav-text">渐进式hash</span></a></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

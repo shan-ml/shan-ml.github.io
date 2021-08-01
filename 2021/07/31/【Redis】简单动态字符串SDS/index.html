@@ -87,10 +87,12 @@
 <meta property="og:site_name" content="SHAN">
 <meta property="og:description" content="C语言字符串 12char *str = &quot;redis&quot;; // 可以不显式的添加\0，由编译器添加char *str = &quot;redis\0&quot;; // 也可以添加\0代表字符串结束 C语言中使用char*字符数组表示字符串，’\0’来标记一个字符串的结束，不过在使用的过程中我们不需要显式的在字符串中加入’\0’。 存在问题 1.二进制安全 C语言以’\0’标记字符串的结尾，如果一个字符串本身带有’">
 <meta property="og:locale" content="default">
-<meta property="og:updated_time" content="2021-07-31T09:54:43.519Z">
+<meta property="og:image" content="http://yoursite.com/images/缓冲区溢出.png">
+<meta property="og:updated_time" content="2021-07-31T09:58:44.088Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="【Redis】简单动态字符串SDS">
 <meta name="twitter:description" content="C语言字符串 12char *str = &quot;redis&quot;; // 可以不显式的添加\0，由编译器添加char *str = &quot;redis\0&quot;; // 也可以添加\0代表字符串结束 C语言中使用char*字符数组表示字符串，’\0’来标记一个字符串的结束，不过在使用的过程中我们不需要显式的在字符串中加入’\0’。 存在问题 1.二进制安全 C语言以’\0’标记字符串的结尾，如果一个字符串本身带有’">
+<meta name="twitter:image" content="http://yoursite.com/images/缓冲区溢出.png">
 
 
 
@@ -307,7 +309,7 @@
 <p><strong>1.二进制安全</strong></p>
 <p>C语言以’\0’标记字符串的结尾，如果一个字符串本身带有’\0’，比如一些二进制数据，那么字符串就会被截断，导致无法存储二进制数据。</p>
 <p><strong>2.缓冲区溢出</strong></p>
-<p>假设内存有两个相邻的字符串s1和s2，s1保存了字符串“Redis”，s2中保存了字符串“MongoDB”，如果不对大小进行判断，直接调用strcat(s1, “Cluster”)函数在s1字符串后面追加“Cluster“，s1的数据溢出到s2所在空间，导致s2的内容被意外的修改。</p>
+<p>假设内存有两个相邻的字符串s1和s2，s1保存了字符串“Redis”，s2中保存了字符串“MongoDB”，如果不对大小进行判断，直接调用strcat(s1, “Cluster”)函数在s1字符串后面追加“Cluster“，s1的数据溢出到s2所在空间，导致s2的内容被意外的修改。<br><img src="/images/缓冲区溢出.png" alt=""></p>
 <p><strong>3.频繁的内存分配</strong></p>
 <p>因为C字符串不记录自身长度，如果对字符串进行修改，需要内存重分配扩展底层数组的空间大小，比如调用strcat函数进行拼接时，需要重新分配内存，保证数组有足够的空间，否则就会发生缓冲区溢出。</p>
 <p>由于内存重分配涉及复杂算法，并且可能需要执行系统调用，所以是一个耗时的操作。</p>
@@ -343,8 +345,8 @@
 <li>如果大于，扩容容量为新长度+SDS_MAX_PREALLOC的值</li>
 </ul>
 <p>（3）由于扩容之后大小发生了改变，需要重新计算使用哪种SDS类型：</p>
-<pre><code>* 如果类型不需要改变，直接扩容即可
-</code></pre><ul>
+<ul>
+<li>如果类型不需要改变，直接扩容即可</li>
 <li>如果类型发生改变，需要重新进行内存分配，并将旧的内存释放</li>
 </ul>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">sds <span class="title">sdsMakeRoomFor</span><span class="params">(sds s, <span class="keyword">size_t</span> addlen)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">void</span> *sh, *newsh;</span><br><span class="line">    <span class="comment">// 获取剩余可用空间大小</span></span><br><span class="line">    <span class="keyword">size_t</span> avail = sdsavail(s);</span><br><span class="line">    <span class="keyword">size_t</span> len, newlen;</span><br><span class="line">    <span class="keyword">char</span> type, oldtype = s[<span class="number">-1</span>] &amp; SDS_TYPE_MASK;</span><br><span class="line">    <span class="keyword">int</span> hdrlen;</span><br><span class="line">    <span class="keyword">size_t</span> usable;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 如果可用空间大于需要增加的长度，返回即可</span></span><br><span class="line">    <span class="keyword">if</span> (avail &gt;= addlen) <span class="keyword">return</span> s;</span><br><span class="line">    <span class="comment">// 获取实际使用的长度</span></span><br><span class="line">    len = sdslen(s);</span><br><span class="line">    sh = (<span class="keyword">char</span>*)s-sdsHdrSize(oldtype);</span><br><span class="line">    <span class="comment">// 计算新的长度，已经使用的长度+需要增加的长度</span></span><br><span class="line">    newlen = (len+addlen);</span><br><span class="line">    assert(newlen &gt; len);   <span class="comment">/* Catch size_t overflow */</span></span><br><span class="line">    <span class="comment">// 如果新的长度小于SDS_MAX_PREALLOC</span></span><br><span class="line">    <span class="keyword">if</span> (newlen &lt; SDS_MAX_PREALLOC)</span><br><span class="line">        <span class="comment">// 扩容为新长度的2倍</span></span><br><span class="line">        newlen *= <span class="number">2</span>;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        <span class="comment">// 新长度 = 新长度+SDS_MAX_PREALLOC</span></span><br><span class="line">        newlen += SDS_MAX_PREALLOC;</span><br><span class="line">    <span class="comment">// 根据新的长度计算需要使用sds的类型</span></span><br><span class="line">    type = sdsReqType(newlen);</span><br><span class="line">    <span class="keyword">if</span> (type == SDS_TYPE_5) type = SDS_TYPE_8;</span><br><span class="line">    <span class="comment">// 获取struct大小</span></span><br><span class="line">    hdrlen = sdsHdrSize(type);</span><br><span class="line">    assert(hdrlen + newlen + <span class="number">1</span> &gt; len);  <span class="comment">/* Catch size_t overflow */</span></span><br><span class="line">    <span class="comment">// 如果sds类型不需要改变</span></span><br><span class="line">    <span class="keyword">if</span> (oldtype==type) &#123;</span><br><span class="line">        <span class="comment">// 扩容</span></span><br><span class="line">        newsh = s_realloc_usable(sh, hdrlen+newlen+<span class="number">1</span>, &amp;usable);</span><br><span class="line">        <span class="keyword">if</span> (newsh == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">        s = (<span class="keyword">char</span>*)newsh+hdrlen;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 如果需要改变sds类型，重新分配空间</span></span><br><span class="line">        newsh = s_malloc_usable(hdrlen+newlen+<span class="number">1</span>, &amp;usable);</span><br><span class="line">        <span class="keyword">if</span> (newsh == <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">        <span class="comment">// 拷贝字符串到字符数组</span></span><br><span class="line">        <span class="built_in">memcpy</span>((<span class="keyword">char</span>*)newsh+hdrlen, s, len+<span class="number">1</span>);</span><br><span class="line">        <span class="comment">// 释放旧的空间</span></span><br><span class="line">        s_free(sh);</span><br><span class="line">        s = (<span class="keyword">char</span>*)newsh+hdrlen;</span><br><span class="line">        s[<span class="number">-1</span>] = type;</span><br><span class="line">        sdssetlen(s, len);</span><br><span class="line">    &#125;</span><br><span class="line">    usable = usable-hdrlen<span class="number">-1</span>;</span><br><span class="line">    <span class="keyword">if</span> (usable &gt; sdsTypeMaxSize(type))</span><br><span class="line">        usable = sdsTypeMaxSize(type);</span><br><span class="line">    sdssetalloc(s, usable);</span><br><span class="line">    <span class="keyword">return</span> s;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -404,6 +406,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/08/01/【Redis】字典/" rel="prev" title="【Redis】简单动态字符串SDS">
+                【Redis】简单动态字符串SDS <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -480,7 +486,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">30</span>
+                  <span class="site-state-item-count">31</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
@@ -493,7 +499,7 @@
               
               <div class="site-state-item site-state-tags">
                 
-                  <span class="site-state-item-count">8</span>
+                  <span class="site-state-item-count">9</span>
                   <span class="site-state-item-name">tags</span>
                 
               </div>
