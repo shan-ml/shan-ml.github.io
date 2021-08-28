@@ -88,7 +88,7 @@
 <meta property="og:description" content="DubboBootstrapApplicationListenerDubboBootstrapApplicationListener是一个监听器，可以监听Dubbo的启动或者关闭事件，如果是启动事件，会通过DubboBootstrap启动dubbo。 1234567891011121314151617181920212223242526272829public class DubboBootstr">
 <meta property="og:locale" content="default">
 <meta property="og:image" content="http://yoursite.com/images/dubbo服务暴露流程.jpg">
-<meta property="og:updated_time" content="2021-08-22T06:36:37.494Z">
+<meta property="og:updated_time" content="2021-08-22T07:23:21.137Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="【Dubbo】Dubbo服务暴露流程">
 <meta name="twitter:description" content="DubboBootstrapApplicationListenerDubboBootstrapApplicationListener是一个监听器，可以监听Dubbo的启动或者关闭事件，如果是启动事件，会通过DubboBootstrap启动dubbo。 1234567891011121314151617181920212223242526272829public class DubboBootstr">
@@ -321,7 +321,7 @@
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> ProxyFactory PROXY_FACTORY = ExtensionLoader.getExtensionLoader(ProxyFactory.class).getAdaptiveExtension();</span><br></pre></td></tr></table></figure>
 <p>ProxyFactory类中使用了SPI注解，由此可知，dubbo默认使用javassist生成代理对象：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@SPI</span>(<span class="string">"javassist"</span>)</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">ProxyFactory</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Adaptive</span>(&#123;PROXY_KEY&#125;)</span><br><span class="line">    &lt;T&gt; <span class="function">T <span class="title">getProxy</span><span class="params">(Invoker&lt;T&gt; invoker)</span> <span class="keyword">throws</span> RpcException</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Adaptive</span>(&#123;PROXY_KEY&#125;)</span><br><span class="line">    &lt;T&gt; <span class="function">T <span class="title">getProxy</span><span class="params">(Invoker&lt;T&gt; invoker, <span class="keyword">boolean</span> generic)</span> <span class="keyword">throws</span> RpcException</span>;</span><br><span class="line"></span><br><span class="line">    <span class="meta">@Adaptive</span>(&#123;PROXY_KEY&#125;)</span><br><span class="line">    &lt;T&gt; <span class="function">Invoker&lt;T&gt; <span class="title">getInvoker</span><span class="params">(T proxy, Class&lt;T&gt; type, URL url)</span> <span class="keyword">throws</span> RpcException</span>;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="Protocol"><a href="#Protocol" class="headerlink" title="Protocol"></a>Protocol</h3><p>ServiceConfig中PROTOCOL的实例化如下，可以看到是通过ExtensionLoader进行实例化的，它是dubbo插件机制的核心，dubbo是支持多种协议的，那么如何根据配置为不同的协议生成不同的Protocol对象，dubbo就是通过ExtensionLoader实现的：</p>
+<h3 id="Protocol"><a href="#Protocol" class="headerlink" title="Protocol"></a>Protocol</h3><p>ServiceConfig中PROTOCOL的实例化如下，可以看到是通过ExtensionLoader进行实例化的，dubbo是支持多种协议的，那么如何根据配置为不同的协议生成不同的Protocol对象，dubbo就是通过ExtensionLoader实现的：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> Protocol PROTOCOL = ExtensionLoader.getExtensionLoader(Protocol.class).getAdaptiveExtension();</span><br></pre></td></tr></table></figure>
 <p>进入Protocol，可以看到使用@SPI注解，并且export方法中使用了@Adaptive注解，通过ExtensionLoader动态生成Protocol$Adaptive类，根据不同的类型决定使用哪种实现类，默认使用dubbo协议DubboProtocol：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@SPI</span>(<span class="string">"dubbo"</span>)</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">interface</span> <span class="title">Protocol</span> </span>&#123;</span><br><span class="line">    <span class="meta">@Adaptive</span></span><br><span class="line">    &lt;T&gt; <span class="function">Exporter&lt;T&gt; <span class="title">export</span><span class="params">(Invoker&lt;T&gt; invoker)</span> <span class="keyword">throws</span> RpcException</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
@@ -386,6 +386,10 @@
           <span class="post-nav-divider"></span>
 
           <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2021/08/28/【Dubbo】Dubbo服务引用流程/" rel="prev" title="【Dubbo】Dubbo服务引用流程">
+                【Dubbo】Dubbo服务引用流程 <i class="fa fa-chevron-right"></i>
+              </a>
             
           </div>
         </div>
@@ -462,7 +466,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">32</span>
+                  <span class="site-state-item-count">33</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
