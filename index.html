@@ -229,6 +229,195 @@
   
   
   <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/09/16/【Redis】skiplist跳跃表/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">
+                
+                <a class="post-title-link" href="/2021/09/16/【Redis】skiplist跳跃表/" itemprop="url">【Redis】skiplist跳跃表</a></h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-09-16T22:00:00+08:00">
+                2021-09-16
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        
+          
+            <h2 id="有序集合Sorted-Set"><a href="#有序集合Sorted-Set" class="headerlink" title="有序集合Sorted Set"></a>有序集合Sorted Set</h2><p><strong>zadd</strong></p>
+<p>zadd用于向集合中添加元素，添加三门编程语言，分值分别为1、2、3：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; zadd language 1 java</span><br><span class="line">(integer) 1</span><br><span class="line">127.0.0.1:6379&gt; zadd language 2 c++</span><br><span class="line">(integer) 1</span><br><span class="line">127.0.0.1:6379&gt; zadd language 3 python</span><br><span class="line">(integer) 1</span><br></pre></td></tr></table></figure>
+<p><strong>zrange</strong></p>
+<p>zrange根据分值区间返回符合条件的数据：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; zrange language 1 3 withscores</span><br><span class="line">1) "c++"</span><br><span class="line">2) "2"</span><br><span class="line">3) "python"</span><br><span class="line">4) "3"</span><br></pre></td></tr></table></figure>
+<p><strong>zscore</strong></p>
+<p>zscore根据key和元素值返回元素的分值</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; zscore language python</span><br><span class="line">"3"</span><br></pre></td></tr></table></figure>
+<p>Sorted Set是Redis中的一种数据结构，它可以用来存储带有分值的元素，并且根据分值进行排序，是一个有序的集合。</p>
+<p>Sorted Set的结构定义如下，它包含了一个哈希表dict和一个跳跃表zskiplist，其中哈希表可以在O(1)的时间复杂度内进行元素查找，而跳跃表可以支持高效的范围查询：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zset</span> &#123;</span></span><br><span class="line">    dict *dict;</span><br><span class="line">    zskiplist *zsl;</span><br><span class="line">&#125; zset;</span><br></pre></td></tr></table></figure>
+<h2 id="跳跃表"><a href="#跳跃表" class="headerlink" title="跳跃表"></a>跳跃表</h2><p>如果一个有序集合中包含的元素数量比较多或者有序集合中的元素是比较长的字符串时，Redis就会使用跳跃表作为有序集合的底层实现。</p>
+<p>跳跃表是一种多层的有序链表，在一个普通的有序链表中如果想要查找某个元素，必须遍历链表，时间复杂度为O(n)，那么如何提高查找效率呢，可以使用跳跃表，从列表中抽出一些元素进行分层，比如每隔一个节点就抽出一层：</p>
+<p><img src="/images/sortlist.jpg" alt=""></p>
+<p>此时如果需要查找元素为9的节点：</p>
+<ol>
+<li>从第三层开始查找，元素的值为8，因为9大于8并且8之后没有其他的节点所以接下来进入第二层</li>
+<li>进入第二层，8的下一个节点为15，9小于15，所以进入第一层</li>
+<li>进入第一层，获取8的下一个节点，等于要查找的值9，查找结束</li>
+</ol>
+<h3 id="结构定义"><a href="#结构定义" class="headerlink" title="结构定义"></a>结构定义</h3><p><strong>跳跃表的结构定义</strong></p>
+<ul>
+<li>header：指向跳跃表中节点的头指针，跳跃表中的节点定义为zskiplistNode，跳跃表实际上也是一个链表，所以会有一个头结点</li>
+<li>tail：指向跳跃表中节点的尾指针</li>
+<li>length：跳跃表中节点的数量</li>
+<li>level：跳跃表的层级</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 跳跃表</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zskiplist</span> &#123;</span></span><br><span class="line">    <span class="comment">// 指向跳跃表的头尾指针</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> *<span class="title">header</span>, *<span class="title">tail</span>;</span></span><br><span class="line">    <span class="comment">// 长度</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> length;</span><br><span class="line">    <span class="comment">// 层级</span></span><br><span class="line">    <span class="keyword">int</span> level;</span><br><span class="line">&#125; zskiplist;</span><br></pre></td></tr></table></figure>
+<p><strong>节点的结构定义</strong></p>
+<ul>
+<li>ele：一个sds类型的变量，存储实际的数据</li>
+<li>score：存储数据的分值，跳跃表就是按照这个分值进行排序的</li>
+<li>backward：一个指向前一个节点的指针，为了便于从后往前查找</li>
+<li>zskiplistLevel：一个层级数组，因为跳跃表可以有多层，每一层中都有一个指向当前层级中的下一个节点的指针forward和span跨度，跨度代表了当前层级里面，当前节点与下一个节点直接跨越了几个节点</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//跳跃表中的节点结构定义</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> &#123;</span></span><br><span class="line">    <span class="comment">// 存储的元素</span></span><br><span class="line">    sds ele;</span><br><span class="line">    <span class="comment">// 分值</span></span><br><span class="line">    <span class="keyword">double</span> score;</span><br><span class="line">    <span class="comment">// 后向指针，指向当前节点的前一个节点</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> *<span class="title">backward</span>;</span></span><br><span class="line">    <span class="comment">// 层级数组</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistLevel</span> &#123;</span></span><br><span class="line">        <span class="comment">// 指向当前层级中的下一个节点</span></span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> *<span class="title">forward</span>;</span></span><br><span class="line">        <span class="comment">// 跨度</span></span><br><span class="line">        <span class="keyword">unsigned</span> <span class="keyword">long</span> span;</span><br><span class="line">    &#125; level[];</span><br><span class="line">&#125; zskiplistNode;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/sortlist.jpg" alt=""></p>
+<h3 id="跳跃表的创建"><a href="#跳跃表的创建" class="headerlink" title="跳跃表的创建"></a>跳跃表的创建</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 创建跳跃表节点*/</span></span><br><span class="line"><span class="function">zskiplistNode *<span class="title">zslCreateNode</span><span class="params">(<span class="keyword">int</span> level, <span class="keyword">double</span> score, sds ele)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 分配内存</span></span><br><span class="line">    zskiplistNode *zn =</span><br><span class="line">        zmalloc(<span class="keyword">sizeof</span>(*zn)+level*<span class="keyword">sizeof</span>(struct zskiplistLevel));</span><br><span class="line">    zn-&gt;score = score;</span><br><span class="line">    zn-&gt;ele = ele;</span><br><span class="line">    <span class="keyword">return</span> zn;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 创建跳跃表 */</span></span><br><span class="line"><span class="function">zskiplist *<span class="title">zslCreate</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">    zskiplist *zsl;</span><br><span class="line">    <span class="comment">// 跳跃表分配内存</span></span><br><span class="line">    zsl = zmalloc(<span class="keyword">sizeof</span>(*zsl));</span><br><span class="line">    <span class="comment">// 层级初始化为1</span></span><br><span class="line">    zsl-&gt;level = <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 长度为0</span></span><br><span class="line">    zsl-&gt;length = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 创建头结点</span></span><br><span class="line">    zsl-&gt;header = zslCreateNode(ZSKIPLIST_MAXLEVEL,<span class="number">0</span>,<span class="literal">NULL</span>);</span><br><span class="line">    <span class="comment">// 初始化每一层的头结点</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; ZSKIPLIST_MAXLEVEL; j++) &#123;</span><br><span class="line">        zsl-&gt;header-&gt;level[j].forward = <span class="literal">NULL</span>;</span><br><span class="line">        zsl-&gt;header-&gt;level[j].span = <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 头结点的下一个节点指向NULL</span></span><br><span class="line">    zsl-&gt;header-&gt;backward = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="comment">// 尾节点</span></span><br><span class="line">    zsl-&gt;tail = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">return</span> zsl;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="跳跃表层数的设置"><a href="#跳跃表层数的设置" class="headerlink" title="跳跃表层数的设置"></a>跳跃表层数的设置</h3><p>跳跃表根据什么规则来进行层数划分呢，有以下几种方案：</p>
+<p><strong>方案一</strong></p>
+<p>每隔一个节点，就取出一个节点作为新的一层的节点，这样每一层上节点的数量大约是下一层节点数的一半，此时类似于二分查找，查找复杂度为O(logn)</p>
+<p><strong>优点：查找的时间复杂度降低了</strong></p>
+<p><strong>缺点：由于需要维护每个层级的节点数，在节点进行插入或者删除的时候，要调整层级节点，带来额外的开销</strong></p>
+<p><strong>方案二</strong></p>
+<p>新增加节点的时候，调用<strong>随机生成层数</strong>方法，随机生成一个当前跳跃表所需要的层数，如果生成的层数等于当前层数，新节点只需要加入跳跃表中即可，不需要额外的维护每一个层级的节点数，Redis中就是使用的随机生成层数的方式维护跳跃表的层级。</p>
+<p>随机生成层数方法：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ZSKIPLIST_MAXLEVEL 32  <span class="comment">// 最大层级不超过32</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ZSKIPLIST_P 0.25 </span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 随机生成层数</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">zslRandomLevel</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> level = <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 如果生成的随机数的值小于ZSKIPLIST_P，层数就+1</span></span><br><span class="line">    <span class="keyword">while</span> ((random()&amp;<span class="number">0xFFFF</span>) &lt; (ZSKIPLIST_P * <span class="number">0xFFFF</span>))</span><br><span class="line">        level += <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 是否超过了最大层数，超过就使用最大层数</span></span><br><span class="line">    <span class="keyword">return</span> (level&lt;ZSKIPLIST_MAXLEVEL) ? level : ZSKIPLIST_MAXLEVEL;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>0xFFFF = 65535</p>
+<p>random()&amp;0xFFFF运算之后会生成一个0和65535之间的数，ZSKIPLIST_P <em> 0xFFFF = 0.25 </em> 65535，所以random()&amp;0xFFFF 小于 0.25 * 65535的概率为25%，也就是层数会增加1的概率不超过25%。</p>
+<h3 id="跳跃表增加节点"><a href="#跳跃表增加节点" class="headerlink" title="跳跃表增加节点"></a>跳跃表增加节点</h3><ol>
+<li>因为跳跃表有多层，所以需要遍历每一层，寻找每层要插入的位置，update[i]就记录了每一层要插入的位置</li>
+<li>随机生成跳跃表的层数，如果层数有变化，则需要调整跳跃表的层高</li>
+<li>创建节点，并将节点插入到跳跃表中</li>
+<li>设置backward，新插入节点的前一个节点是update[0],如果update[0]为头结点，当前节点的前一个节点设为null,否则backward设置为update[0]</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">zskiplistNode *<span class="title">zslInsert</span><span class="params">(zskiplist *zsl, <span class="keyword">double</span> score, sds ele)</span> </span>&#123;</span><br><span class="line">    zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> rank[ZSKIPLIST_MAXLEVEL];</span><br><span class="line">    <span class="keyword">int</span> i, level;</span><br><span class="line">    serverAssert(!isnan(score));</span><br><span class="line">    <span class="comment">//获取头结点</span></span><br><span class="line">    x = zsl-&gt;header;</span><br><span class="line">    <span class="comment">/* 寻找每层要插入的位置，从高层开始向下遍历 */</span></span><br><span class="line">    <span class="keyword">for</span> (i = zsl-&gt;level<span class="number">-1</span>; i &gt;= <span class="number">0</span>; i--) &#123;</span><br><span class="line">        <span class="comment">// rank[i]记录了当前层从header节点到update[i]节点所经历的步长</span></span><br><span class="line">        rank[i] = i == (zsl-&gt;level<span class="number">-1</span>) ? <span class="number">0</span> : rank[i+<span class="number">1</span>];</span><br><span class="line">        <span class="comment">// 如果当前层级下一个节点不为空 并且 下一个节点的score小于要插入节点的分值 或者 下一个节点的score等于要插入节点的score并且对比两个节点存储的元素值之后小于0（字符串比较）</span></span><br><span class="line">        <span class="keyword">while</span> (x-&gt;level[i].forward &amp;&amp;</span><br><span class="line">                (x-&gt;level[i].forward-&gt;score &lt; score ||</span><br><span class="line">                    (x-&gt;level[i].forward-&gt;score == score &amp;&amp;</span><br><span class="line">                    sdscmp(x-&gt;level[i].forward-&gt;ele,ele) &lt; <span class="number">0</span>)))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="comment">// 更新rank[i]的值</span></span><br><span class="line">            rank[i] += x-&gt;level[i].span;</span><br><span class="line">            <span class="comment">// 获取下一个节点</span></span><br><span class="line">            x = x-&gt;level[i].forward;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 记录每层需要插入的位置</span></span><br><span class="line">        update[i] = x;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 随机生成跳跃表的层数</span></span><br><span class="line">    level = zslRandomLevel();</span><br><span class="line">    <span class="comment">// 如果大于当前的层数</span></span><br><span class="line">    <span class="keyword">if</span> (level &gt; zsl-&gt;level) &#123;</span><br><span class="line">        <span class="comment">// 调整层数</span></span><br><span class="line">        <span class="keyword">for</span> (i = zsl-&gt;level; i &lt; level; i++) &#123;</span><br><span class="line">            rank[i] = <span class="number">0</span>;</span><br><span class="line">            update[i] = zsl-&gt;header;</span><br><span class="line">            update[i]-&gt;level[i].span = zsl-&gt;length;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 更新层数</span></span><br><span class="line">        zsl-&gt;level = level;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 创建节点</span></span><br><span class="line">    x = zslCreateNode(level,score,ele);</span><br><span class="line">    <span class="comment">// 循环每一层，添加节点</span></span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; level; i++) &#123;</span><br><span class="line">        x-&gt;level[i].forward = update[i]-&gt;level[i].forward;</span><br><span class="line">        update[i]-&gt;level[i].forward = x;</span><br><span class="line">        x-&gt;level[i].span = update[i]-&gt;level[i].span - (rank[<span class="number">0</span>] - rank[i]);</span><br><span class="line">        update[i]-&gt;level[i].span = (rank[<span class="number">0</span>] - rank[i]) + <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 更新跨度 */</span></span><br><span class="line">    <span class="keyword">for</span> (i = level; i &lt; zsl-&gt;level; i++) &#123;</span><br><span class="line">        update[i]-&gt;level[i].span++;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 设置当前节点的前一个节点，如果update[0]为头结点，当前节点的前一个节点设为null,否则backward设置为update[0]</span></span><br><span class="line">    x-&gt;backward = (update[<span class="number">0</span>] == zsl-&gt;header) ? <span class="literal">NULL</span> : update[<span class="number">0</span>];</span><br><span class="line">    <span class="keyword">if</span> (x-&gt;level[<span class="number">0</span>].forward)</span><br><span class="line">        x-&gt;level[<span class="number">0</span>].forward-&gt;backward = x;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        zsl-&gt;tail = x;</span><br><span class="line">    <span class="comment">// 增加长度</span></span><br><span class="line">    zsl-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>总结</strong></p>
+<ol>
+<li>Sorted Set支持在添加元素的时候为元素添加一个分值，并根据分值排序，是一个有序的集合。</li>
+<li>Sorted Set在数据比较少的时候采用ziplist存储，超过阈值后使用哈希表和跳跃表来提高查找效率，其中哈希表用于单值查询，跳跃表用于范围查询。</li>
+<li>跳跃表是一个多层的有序链表，它采用了空间换时间的方式将查找的实际复杂度降到了O(logN)。</li>
+</ol>
+<p><strong>参考</strong></p>
+<p>黄健宏《Redis设计与实现》</p>
+<p>陈雷《Redis5设计与源码分析》</p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
+<p><a href="https://blog.csdn.net/unix21/article/details/10197115/" target="_blank" rel="noopener">【unix21】redis源码分析–zslRandomLevel位运算解析</a></p>
+<p><a href="https://www.cnblogs.com/riches/p/13515730.html" target="_blank" rel="noopener">【有梦想的肥宅】Redis5设计与源码分析读后感（三）跳跃表</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+          
+        
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+
+      
+
+      
+
+      
+      
+        <div class="post-eof"></div>
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+    
+      
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
     <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/09/12/【Redis】ziplist压缩列表/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -1505,195 +1694,6 @@
 <p><a href="https://blog.csdn.net/yellowriver007/article/details/79020923" target="_blank" rel="noopener">yellowriver007  -  Redis内部数据结构详解(2)——sds</a></p>
 <p><a href="https://blog.csdn.net/qq_33361976/article/details/109014012" target="_blank" rel="noopener">偷懒的程序员-小彭  -  redis 系列，要懂redis，首先得看懂sds（全网最细节的sds讲解）</a></p>
 <p><a href="https://blog.csdn.net/gatieme/article/details/64131322" target="_blank" rel="noopener">CHENG Jian  -  C语言0长度数组(可变数组/柔性数组)详解</a></p>
-<p><strong>Redis版本：redis-6.2.5</strong></p>
-
-          
-        
-      
-    </div>
-    
-    
-    
-
-    
-
-    
-
-    
-
-    <footer class="post-footer">
-      
-
-      
-
-      
-
-      
-      
-        <div class="post-eof"></div>
-      
-    </footer>
-  </div>
-  
-  
-  
-  </article>
-
-
-    
-      
-
-  
-
-  
-  
-  
-
-  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
-  
-  
-  
-  <div class="post-block">
-    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/07/31/【Redis】skiplist跳跃表/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="name" content="shan">
-      <meta itemprop="description" content="">
-      <meta itemprop="image" content="/images/avatar.gif">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="SHAN">
-    </span>
-
-    
-      <header class="post-header">
-
-        
-        
-          <h1 class="post-title" itemprop="name headline">
-                
-                <a class="post-title-link" href="/2021/07/31/【Redis】skiplist跳跃表/" itemprop="url">Untitled</a></h1>
-        
-
-        <div class="post-meta">
-          <span class="post-time">
-            
-              <span class="post-meta-item-icon">
-                <i class="fa fa-calendar-o"></i>
-              </span>
-              
-                <span class="post-meta-item-text">Posted on</span>
-              
-              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-07-31T14:40:06+08:00">
-                2021-07-31
-              </time>
-            
-
-            
-
-            
-          </span>
-
-          
-
-          
-            
-          
-
-          
-          
-
-          
-
-          
-
-          
-
-        </div>
-      </header>
-    
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-      
-
-      
-        
-          
-            <h2 id="有序集合Sorted-Set"><a href="#有序集合Sorted-Set" class="headerlink" title="有序集合Sorted Set"></a>有序集合Sorted Set</h2><p><strong>zadd</strong></p>
-<p>zadd用于向集合中添加元素，添加三门编程语言，分值分别为1、2、3：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; zadd language 1 java</span><br><span class="line">(integer) 1</span><br><span class="line">127.0.0.1:6379&gt; zadd language 2 c++</span><br><span class="line">(integer) 1</span><br><span class="line">127.0.0.1:6379&gt; zadd language 3 python</span><br><span class="line">(integer) 1</span><br></pre></td></tr></table></figure>
-<p><strong>zrange</strong></p>
-<p>zrange根据分值区间返回符合条件的数据：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; zrange language 1 3 withscores</span><br><span class="line">1) "c++"</span><br><span class="line">2) "2"</span><br><span class="line">3) "python"</span><br><span class="line">4) "3"</span><br></pre></td></tr></table></figure>
-<p><strong>zscore</strong></p>
-<p>zscore根据key和元素值返回元素的分值</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">127.0.0.1:6379&gt; zscore language python</span><br><span class="line">"3"</span><br></pre></td></tr></table></figure>
-<p>Sorted Set是Redis中的一种数据结构，它可以用来存储带有分值的元素，并且根据分值进行排序，是一个有序的集合。</p>
-<p>Sorted Set的结构定义如下，它包含了一个哈希表dict和一个跳跃表zskiplist，其中哈希表可以在O(1)的时间复杂度内进行元素查找，而跳跃表可以支持高效的范围查询：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zset</span> &#123;</span></span><br><span class="line">    dict *dict;</span><br><span class="line">    zskiplist *zsl;</span><br><span class="line">&#125; zset;</span><br></pre></td></tr></table></figure>
-<h2 id="跳跃表"><a href="#跳跃表" class="headerlink" title="跳跃表"></a>跳跃表</h2><p>如果一个有序集合中包含的元素数量比较多或者有序集合中的元素是比较长的字符串时，Redis就会使用跳跃表作为有序集合的底层实现。</p>
-<p>跳跃表是一种多层的有序链表，在一个普通的有序链表中如果想要查找某个元素，必须遍历链表，时间复杂度为O(n)，那么如何提高查找效率呢，可以使用跳跃表，从列表中抽出一些元素进行分层，比如每隔一个节点就抽出一层：</p>
-<p><img src="/images/sortlist.jpg" alt=""></p>
-<p>此时如果需要查找元素为9的节点：</p>
-<ol>
-<li>从第三层开始查找，元素的值为8，因为9大于8并且8之后没有其他的节点所以接下来进入第二层</li>
-<li>进入第二层，8的下一个节点为15，9小于15，所以进入第一层</li>
-<li>进入第一层，获取8的下一个节点，等于要查找的值9，查找结束</li>
-</ol>
-<h3 id="结构定义"><a href="#结构定义" class="headerlink" title="结构定义"></a>结构定义</h3><p><strong>跳跃表的结构定义</strong></p>
-<ul>
-<li>header：指向跳跃表中节点的头指针，跳跃表中的节点定义为zskiplistNode，跳跃表实际上也是一个链表，所以会有一个头结点</li>
-<li>tail：指向跳跃表中节点的尾指针</li>
-<li>length：跳跃表中节点的数量</li>
-<li>level：跳跃表的层级</li>
-</ul>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 跳跃表</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zskiplist</span> &#123;</span></span><br><span class="line">    <span class="comment">// 指向跳跃表的头尾指针</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> *<span class="title">header</span>, *<span class="title">tail</span>;</span></span><br><span class="line">    <span class="comment">// 长度</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> length;</span><br><span class="line">    <span class="comment">// 层级</span></span><br><span class="line">    <span class="keyword">int</span> level;</span><br><span class="line">&#125; zskiplist;</span><br></pre></td></tr></table></figure>
-<p><strong>节点的结构定义</strong></p>
-<ul>
-<li>ele：一个sds类型的变量，存储实际的数据</li>
-<li>score：存储数据的分值，跳跃表就是按照这个分值进行排序的</li>
-<li>backward：一个指向前一个节点的指针，为了便于从后往前查找</li>
-<li>zskiplistLevel：一个层级数组，因为跳跃表可以有多层，每一层中都有一个指向当前层级中的下一个节点的指针forward和span跨度，跨度代表了当前层级里面，当前节点与下一个节点直接跨越了几个节点</li>
-</ul>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//跳跃表中的节点结构定义</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> &#123;</span></span><br><span class="line">    <span class="comment">// 存储的元素</span></span><br><span class="line">    sds ele;</span><br><span class="line">    <span class="comment">// 分值</span></span><br><span class="line">    <span class="keyword">double</span> score;</span><br><span class="line">    <span class="comment">// 后向指针，指向当前节点的前一个节点</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> *<span class="title">backward</span>;</span></span><br><span class="line">    <span class="comment">// 层级数组</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistLevel</span> &#123;</span></span><br><span class="line">        <span class="comment">// 指向当前层级中的下一个节点</span></span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">zskiplistNode</span> *<span class="title">forward</span>;</span></span><br><span class="line">        <span class="comment">// 跨度</span></span><br><span class="line">        <span class="keyword">unsigned</span> <span class="keyword">long</span> span;</span><br><span class="line">    &#125; level[];</span><br><span class="line">&#125; zskiplistNode;</span><br></pre></td></tr></table></figure>
-<p><img src="/images/sortlist.jpg" alt=""></p>
-<h3 id="跳跃表的创建"><a href="#跳跃表的创建" class="headerlink" title="跳跃表的创建"></a>跳跃表的创建</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 创建跳跃表节点*/</span></span><br><span class="line"><span class="function">zskiplistNode *<span class="title">zslCreateNode</span><span class="params">(<span class="keyword">int</span> level, <span class="keyword">double</span> score, sds ele)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 分配内存</span></span><br><span class="line">    zskiplistNode *zn =</span><br><span class="line">        zmalloc(<span class="keyword">sizeof</span>(*zn)+level*<span class="keyword">sizeof</span>(struct zskiplistLevel));</span><br><span class="line">    zn-&gt;score = score;</span><br><span class="line">    zn-&gt;ele = ele;</span><br><span class="line">    <span class="keyword">return</span> zn;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 创建跳跃表 */</span></span><br><span class="line"><span class="function">zskiplist *<span class="title">zslCreate</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">    zskiplist *zsl;</span><br><span class="line">    <span class="comment">// 跳跃表分配内存</span></span><br><span class="line">    zsl = zmalloc(<span class="keyword">sizeof</span>(*zsl));</span><br><span class="line">    <span class="comment">// 层级初始化为1</span></span><br><span class="line">    zsl-&gt;level = <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 长度为0</span></span><br><span class="line">    zsl-&gt;length = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 创建头结点</span></span><br><span class="line">    zsl-&gt;header = zslCreateNode(ZSKIPLIST_MAXLEVEL,<span class="number">0</span>,<span class="literal">NULL</span>);</span><br><span class="line">    <span class="comment">// 初始化每一层的头结点</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; ZSKIPLIST_MAXLEVEL; j++) &#123;</span><br><span class="line">        zsl-&gt;header-&gt;level[j].forward = <span class="literal">NULL</span>;</span><br><span class="line">        zsl-&gt;header-&gt;level[j].span = <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 头结点的下一个节点指向NULL</span></span><br><span class="line">    zsl-&gt;header-&gt;backward = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="comment">// 尾节点</span></span><br><span class="line">    zsl-&gt;tail = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">return</span> zsl;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="跳跃表层数的设置"><a href="#跳跃表层数的设置" class="headerlink" title="跳跃表层数的设置"></a>跳跃表层数的设置</h3><p>跳跃表根据什么规则来进行层数划分呢，有以下几种方案：</p>
-<p><strong>方案一</strong></p>
-<p>每隔一个节点，就取出一个节点作为新的一层的节点，这样每一层上节点的数量大约是下一层节点数的一半，此时类似于二分查找，查找复杂度为O(logn)</p>
-<p><strong>优点：查找的时间复杂度降低了</strong></p>
-<p><strong>缺点：由于需要维护每个层级的节点数，在节点进行插入或者删除的时候，要调整层级节点，带来额外的开销</strong></p>
-<p><strong>方案二</strong></p>
-<p>新增加节点的时候，调用<strong>随机生成层数</strong>方法，随机生成一个当前跳跃表所需要的层数，如果生成的层数等于当前层数，新节点只需要加入跳跃表中即可，不需要额外的维护每一个层级的节点数，Redis中就是使用的随机生成层数的方式维护跳跃表的层级。</p>
-<p>随机生成层数方法：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ZSKIPLIST_MAXLEVEL 32  <span class="comment">// 最大层级不超过32</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> ZSKIPLIST_P 0.25 </span></span><br><span class="line"></span><br><span class="line"><span class="comment">// 随机生成层数</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">zslRandomLevel</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> level = <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 如果生成的随机数的值小于ZSKIPLIST_P，层数就+1</span></span><br><span class="line">    <span class="keyword">while</span> ((random()&amp;<span class="number">0xFFFF</span>) &lt; (ZSKIPLIST_P * <span class="number">0xFFFF</span>))</span><br><span class="line">        level += <span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 是否超过了最大层数，超过就使用最大层数</span></span><br><span class="line">    <span class="keyword">return</span> (level&lt;ZSKIPLIST_MAXLEVEL) ? level : ZSKIPLIST_MAXLEVEL;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>0xFFFF = 65535</p>
-<p>random()&amp;0xFFFF运算之后会生成一个0和65535之间的数，ZSKIPLIST_P <em> 0xFFFF = 0.25 </em> 65535，所以random()&amp;0xFFFF 小于 0.25 * 65535的概率为25%，也就是层数会增加1的概率不超过25%。</p>
-<h3 id="跳跃表增加节点"><a href="#跳跃表增加节点" class="headerlink" title="跳跃表增加节点"></a>跳跃表增加节点</h3><ol>
-<li>因为跳跃表有多层，所以需要遍历每一层，寻找每层要插入的位置，update[i]就记录了每一层要插入的位置</li>
-<li>随机生成跳跃表的层数，如果层数有变化，则需要调整跳跃表的层高</li>
-<li>创建节点，并将节点插入到跳跃表中</li>
-<li>设置backward，新插入节点的前一个节点是update[0],如果update[0]为头结点，当前节点的前一个节点设为null,否则backward设置为update[0]</li>
-</ol>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">zskiplistNode *<span class="title">zslInsert</span><span class="params">(zskiplist *zsl, <span class="keyword">double</span> score, sds ele)</span> </span>&#123;</span><br><span class="line">    zskiplistNode *update[ZSKIPLIST_MAXLEVEL], *x;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> rank[ZSKIPLIST_MAXLEVEL];</span><br><span class="line">    <span class="keyword">int</span> i, level;</span><br><span class="line">    serverAssert(!isnan(score));</span><br><span class="line">    <span class="comment">//获取头结点</span></span><br><span class="line">    x = zsl-&gt;header;</span><br><span class="line">    <span class="comment">/* 寻找每层要插入的位置，从高层开始向下遍历 */</span></span><br><span class="line">    <span class="keyword">for</span> (i = zsl-&gt;level<span class="number">-1</span>; i &gt;= <span class="number">0</span>; i--) &#123;</span><br><span class="line">        <span class="comment">// rank[i]记录了当前层从header节点到update[i]节点所经历的步长</span></span><br><span class="line">        rank[i] = i == (zsl-&gt;level<span class="number">-1</span>) ? <span class="number">0</span> : rank[i+<span class="number">1</span>];</span><br><span class="line">        <span class="comment">// 如果当前层级下一个节点不为空 并且 下一个节点的score小于要插入节点的分值 或者 下一个节点的score等于要插入节点的score并且对比两个节点存储的元素值之后小于0（字符串比较）</span></span><br><span class="line">        <span class="keyword">while</span> (x-&gt;level[i].forward &amp;&amp;</span><br><span class="line">                (x-&gt;level[i].forward-&gt;score &lt; score ||</span><br><span class="line">                    (x-&gt;level[i].forward-&gt;score == score &amp;&amp;</span><br><span class="line">                    sdscmp(x-&gt;level[i].forward-&gt;ele,ele) &lt; <span class="number">0</span>)))</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="comment">// 更新rank[i]的值</span></span><br><span class="line">            rank[i] += x-&gt;level[i].span;</span><br><span class="line">            <span class="comment">// 获取下一个节点</span></span><br><span class="line">            x = x-&gt;level[i].forward;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 记录每层需要插入的位置</span></span><br><span class="line">        update[i] = x;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 随机生成跳跃表的层数</span></span><br><span class="line">    level = zslRandomLevel();</span><br><span class="line">    <span class="comment">// 如果大于当前的层数</span></span><br><span class="line">    <span class="keyword">if</span> (level &gt; zsl-&gt;level) &#123;</span><br><span class="line">        <span class="comment">// 调整层数</span></span><br><span class="line">        <span class="keyword">for</span> (i = zsl-&gt;level; i &lt; level; i++) &#123;</span><br><span class="line">            rank[i] = <span class="number">0</span>;</span><br><span class="line">            update[i] = zsl-&gt;header;</span><br><span class="line">            update[i]-&gt;level[i].span = zsl-&gt;length;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 更新层数</span></span><br><span class="line">        zsl-&gt;level = level;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 创建节点</span></span><br><span class="line">    x = zslCreateNode(level,score,ele);</span><br><span class="line">    <span class="comment">// 循环每一层，添加节点</span></span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; level; i++) &#123;</span><br><span class="line">        x-&gt;level[i].forward = update[i]-&gt;level[i].forward;</span><br><span class="line">        update[i]-&gt;level[i].forward = x;</span><br><span class="line">        x-&gt;level[i].span = update[i]-&gt;level[i].span - (rank[<span class="number">0</span>] - rank[i]);</span><br><span class="line">        update[i]-&gt;level[i].span = (rank[<span class="number">0</span>] - rank[i]) + <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 更新跨度 */</span></span><br><span class="line">    <span class="keyword">for</span> (i = level; i &lt; zsl-&gt;level; i++) &#123;</span><br><span class="line">        update[i]-&gt;level[i].span++;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 设置当前节点的前一个节点，如果update[0]为头结点，当前节点的前一个节点设为null,否则backward设置为update[0]</span></span><br><span class="line">    x-&gt;backward = (update[<span class="number">0</span>] == zsl-&gt;header) ? <span class="literal">NULL</span> : update[<span class="number">0</span>];</span><br><span class="line">    <span class="keyword">if</span> (x-&gt;level[<span class="number">0</span>].forward)</span><br><span class="line">        x-&gt;level[<span class="number">0</span>].forward-&gt;backward = x;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        zsl-&gt;tail = x;</span><br><span class="line">    <span class="comment">// 增加长度</span></span><br><span class="line">    zsl-&gt;length++;</span><br><span class="line">    <span class="keyword">return</span> x;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p><strong>总结</strong></p>
-<ol>
-<li>Sorted Set支持在添加元素的时候为元素添加一个分值，并根据分值排序，是一个有序的集合。</li>
-<li>Sorted Set在数据比较少的时候采用ziplist存储，超过阈值后使用哈希表和跳跃表来提高查找效率，其中哈希表用于单值查询，跳跃表用于范围查询。</li>
-<li>跳跃表是一个多层的有序链表，它采用了空间换时间的方式将查找的实际复杂度降到了O(logN)。</li>
-</ol>
-<p><strong>参考</strong></p>
-<p>黄健宏《Redis设计与实现》</p>
-<p>陈雷《Redis5设计与源码分析》</p>
-<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
-<p><a href="https://blog.csdn.net/unix21/article/details/10197115/" target="_blank" rel="noopener">【unix21】redis源码分析–zslRandomLevel位运算解析</a></p>
-<p><a href="https://www.cnblogs.com/riches/p/13515730.html" target="_blank" rel="noopener">【有梦想的肥宅】Redis5设计与源码分析读后感（三）跳跃表</a></p>
 <p><strong>Redis版本：redis-6.2.5</strong></p>
 
           
