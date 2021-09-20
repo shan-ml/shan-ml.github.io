@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Redis List在Redis3.2版之前，Redis使用压缩列表和双向链表作为List的底层实现。当元素个数比较少并且元素长度比较小时，Redis使用压缩列表实现，否则Redis使用双向链表实现。 ziplist存在问题  不能保存过多的元素，否则查找复杂度高，性能降低。  由于每个节点保存了前一个节点的长度，不同长度使用的字节数不一样，所以在更新节点的时候有可能引起长度的变化导致连锁更新问题">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】quicklist">
+<meta property="og:url" content="http://yoursite.com/2021/09/20/【Redis】quicklist/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="Redis List在Redis3.2版之前，Redis使用压缩列表和双向链表作为List的底层实现。当元素个数比较少并且元素长度比较小时，Redis使用压缩列表实现，否则Redis使用双向链表实现。 ziplist存在问题  不能保存过多的元素，否则查找复杂度高，性能降低。  由于每个节点保存了前一个节点的长度，不同长度使用的字节数不一样，所以在更新节点的时候有可能引起长度的变化导致连锁更新问题">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/images/quicklist.jpg">
+<meta property="og:image" content="http://yoursite.com/images/quicklist.jpg">
+<meta property="og:updated_time" content="2021-09-20T09:04:52.579Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】quicklist">
+<meta name="twitter:description" content="Redis List在Redis3.2版之前，Redis使用压缩列表和双向链表作为List的底层实现。当元素个数比较少并且元素长度比较小时，Redis使用压缩列表实现，否则Redis使用双向链表实现。 ziplist存在问题  不能保存过多的元素，否则查找复杂度高，性能降低。  由于每个节点保存了前一个节点的长度，不同长度使用的字节数不一样，所以在更新节点的时候有可能引起长度的变化导致连锁更新问题">
+<meta name="twitter:image" content="http://yoursite.com/images/quicklist.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2021/09/20/【Redis】quicklist/"/>
+
+
+
+
+
+  <title>【Redis】quicklist | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2021/09/20/【Redis】quicklist/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】quicklist</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2021-09-20T17:00:00+08:00">
+                2021-09-20
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="Redis-List"><a href="#Redis-List" class="headerlink" title="Redis List"></a>Redis List</h2><p>在Redis3.2版之前，Redis使用压缩列表和双向链表作为List的底层实现。当元素个数比较少并且元素长度比较小时，Redis使用压缩列表实现，否则Redis使用双向链表实现。</p>
+<p><strong>ziplist存在问题</strong></p>
+<ol>
+<li><p>不能保存过多的元素，否则查找复杂度高，性能降低。</p>
+</li>
+<li><p>由于每个节点保存了前一个节点的长度，不同长度使用的字节数不一样，所以在更新节点的时候有可能引起长度的变化导致连锁更新问题。</p>
+</li>
+</ol>
+<p>为了解决上面两个问题，在Redis3.2版之后，引入了quicklist。</p>
+<h3 id="quicklist"><a href="#quicklist" class="headerlink" title="quicklist"></a>quicklist</h3><p>quicklist可以理解为是ziplist和链表的结合体，一个quicklist是一个双向链表，链表中的每一个节点是一个ziplist。</p>
+<p><img src="/images/quicklist.jpg" alt=""></p>
+<h4 id="quicklist结构定义"><a href="#quicklist结构定义" class="headerlink" title="quicklist结构定义"></a>quicklist结构定义</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">quicklist</span> &#123;</span></span><br><span class="line">    <span class="comment">// 头指针</span></span><br><span class="line">    quicklistNode *head;</span><br><span class="line">    <span class="comment">// 尾指针</span></span><br><span class="line">    quicklistNode *tail;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> count;        <span class="comment">/* 列表中的元素总个数，也就是所有ziplist中包含的元素数量之和 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> len;          <span class="comment">/* 链表中节点的个数 */</span></span><br><span class="line">    <span class="keyword">int</span> fill : QL_FILL_BITS;              <span class="comment">/* 表示ziplist的大小 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> compress : QL_COMP_BITS; <span class="comment">/* depth of end nodes not to compress;0=off */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> bookmark_count: QL_BM_BITS;</span><br><span class="line">    quicklistBookmark bookmarks[];</span><br><span class="line">&#125; quicklist;</span><br></pre></td></tr></table></figure>
+<ul>
+<li><p>head：指向头结点的指针</p>
+</li>
+<li><p>tail：指向尾节点的指针</p>
+</li>
+<li><p>count：列表中的元素总个数，等于所有节点的ziplist中包含的元素数量之和</p>
+</li>
+<li><p>len：quicklist中quicklistNode节点的个数</p>
+</li>
+<li><p>fill：用来限制quicklistNode中ziplist的大小，为正数时代表ziplist中最多能包含的元素个数，为负数时有以下几种情况：</p>
+<p>| 数值 | 含义                            |<br>| —- | ——————————- |<br>| -1   | 表示ziplist的字节数不能超过4KB  |<br>| -2   | 表示ziplist的字节数不能超过8KB  |<br>| -3   | 表示ziplist的字节数不能超过16KB |<br>| -4   | 表示ziplist的字节数不能超过32KB |<br>| -5   | 表示ziplist的字节数不能超过64KB |</p>
+</li>
+</ul>
+<p>​       除此之外，也可以通过<strong>list-max-ziplist-size</strong>参数配置最大的字节数。</p>
+<h4 id="quicklistNode结构定义"><a href="#quicklistNode结构定义" class="headerlink" title="quicklistNode结构定义"></a>quicklistNode结构定义</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">quicklistNode</span> &#123;</span></span><br><span class="line">    <span class="comment">// 前一个节点</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">quicklistNode</span> *<span class="title">prev</span>;</span></span><br><span class="line">    <span class="comment">// 下一个节点</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">quicklistNode</span> *<span class="title">next</span>;</span></span><br><span class="line">    <span class="comment">// 指向ziplist压缩列表的指针</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> *zl;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> sz;             <span class="comment">/* ziplist压缩列表的字节数 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> count : <span class="number">16</span>;     <span class="comment">/* ziplist压缩列表的元素个数 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> encoding : <span class="number">2</span>;   <span class="comment">/* 编码格式：RAW==1 or LZF==2 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> container : <span class="number">2</span>;  <span class="comment">/* NONE==1 or ZIPLIST==2 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> recompress : <span class="number">1</span>; <span class="comment">/* 是否被压缩 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> attempted_compress : <span class="number">1</span>; <span class="comment">/* 是否可以被压缩 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> extra : <span class="number">10</span>; <span class="comment">/* 预留bit位*/</span></span><br><span class="line">&#125; quicklistNode;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/quicklist.jpg" alt=""></p>
+<h4 id="quicklist创建"><a href="#quicklist创建" class="headerlink" title="quicklist创建"></a>quicklist创建</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">quicklist *<span class="title">quicklistCreate</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">quicklist</span> *<span class="title">quicklist</span>;</span></span><br><span class="line">    <span class="comment">// 分配空间</span></span><br><span class="line">    quicklist = zmalloc(<span class="keyword">sizeof</span>(*quicklist));</span><br><span class="line">    <span class="comment">// 初始化头尾节点</span></span><br><span class="line">    quicklist-&gt;head = quicklist-&gt;tail = <span class="literal">NULL</span>;</span><br><span class="line">    quicklist-&gt;len = <span class="number">0</span>;</span><br><span class="line">    quicklist-&gt;count = <span class="number">0</span>;</span><br><span class="line">    quicklist-&gt;compress = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 默认为-2，表示ziplist的字节数最大不能超过8KB</span></span><br><span class="line">    quicklist-&gt;fill = <span class="number">-2</span>;</span><br><span class="line">    quicklist-&gt;bookmark_count = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">return</span> quicklist;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="添加元素"><a href="#添加元素" class="headerlink" title="添加元素"></a>添加元素</h4><p>添加元素的时候可以在链表的头部或者尾部进行添加，以头部添加为例：</p>
+<ol>
+<li>首先调用_quicklistNodeAllowInsert方法判断是否允许添加元素到ziplist，如果允许，调用ziplistPush方法进行添加</li>
+<li>如果_quicklistNodeAllowInsert不允许添加元素，则需要新创建一个quicklistNode，然后将元素添加到新创建的quicklistNode的压缩列表中</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 从头部添加元素</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">quicklistPushHead</span><span class="params">(quicklist *quicklist, <span class="keyword">void</span> *value, <span class="keyword">size_t</span> sz)</span> </span>&#123;</span><br><span class="line">    quicklistNode *orig_head = quicklist-&gt;head;</span><br><span class="line">    <span class="comment">// 判断是否允许添加</span></span><br><span class="line">    <span class="keyword">if</span> (likely(</span><br><span class="line">            _quicklistNodeAllowInsert(quicklist-&gt;head, quicklist-&gt;fill, sz))) &#123;</span><br><span class="line">        <span class="comment">// 将元素添加到ziplit</span></span><br><span class="line">        quicklist-&gt;head-&gt;zl =</span><br><span class="line">            ziplistPush(quicklist-&gt;head-&gt;zl, value, sz, ZIPLIST_HEAD);</span><br><span class="line">        quicklistNodeUpdateSz(quicklist-&gt;head);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 新创建quicklistNode节点</span></span><br><span class="line">        quicklistNode *node = quicklistCreateNode();</span><br><span class="line">        <span class="comment">// 添加元素</span></span><br><span class="line">        node-&gt;zl = ziplistPush(ziplistNew(), value, sz, ZIPLIST_HEAD);</span><br><span class="line"></span><br><span class="line">        quicklistNodeUpdateSz(node);</span><br><span class="line">        _quicklistInsertNodeBefore(quicklist, quicklist-&gt;head, node);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 更新数量</span></span><br><span class="line">    quicklist-&gt;count++;</span><br><span class="line">    quicklist-&gt;head-&gt;count++;</span><br><span class="line">    <span class="keyword">return</span> (orig_head != quicklist-&gt;head);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>_quicklistNodeAllowInsert</strong></p>
+<p><strong>_quicklistNodeAllowInsert</strong>方法用于判断是否允许在某个quicklistNode指向的压缩列表中添加元素。</p>
+<p>在quicklist的结构体定义中，fill指定了ziplist中能包含的最大元素个数或者ziplist最大的字节数，_quicklistNodeAllowInsert方法就是判断ziplist中的元素个数或者ziplist的字节数是否超过了限制：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// node：当前的quicklistNode节点</span></span><br><span class="line"><span class="comment">// fill：ziplist中能包含的最大元素个数或者ziplist最大的字节数</span></span><br><span class="line"><span class="comment">// sz：要添加元素的大小</span></span><br><span class="line">REDIS_STATIC <span class="keyword">int</span> _quicklistNodeAllowInsert(<span class="keyword">const</span> quicklistNode *node,</span><br><span class="line">                                           <span class="keyword">const</span> <span class="keyword">int</span> fill, <span class="keyword">const</span> <span class="keyword">size_t</span> sz) &#123;</span><br><span class="line">    <span class="keyword">if</span> (unlikely(!node))</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> ziplist_overhead;</span><br><span class="line">    <span class="comment">/* 判断要添加元素的大小是否小于254 */</span></span><br><span class="line">    <span class="keyword">if</span> (sz &lt; <span class="number">254</span>)</span><br><span class="line">        ziplist_overhead = <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        ziplist_overhead = <span class="number">5</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 判断要添加元素的大小是否小于64 */</span></span><br><span class="line">    <span class="keyword">if</span> (sz &lt; <span class="number">64</span>)</span><br><span class="line">        ziplist_overhead += <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (likely(sz &lt; <span class="number">16384</span>))</span><br><span class="line">        ziplist_overhead += <span class="number">2</span>;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        ziplist_overhead += <span class="number">5</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 计算添加元素后的当前的quicklistNode的大小 + 新加入元素的大小 + 插入元素后ziplit的prevlen占用大小 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> new_sz = node-&gt;sz + sz + ziplist_overhead;</span><br><span class="line">    <span class="comment">// 判断添加元素后的ziplist的字节数是否超过了fill中设置的大小</span></span><br><span class="line">    <span class="keyword">if</span> (likely(_quicklistNodeSizeMeetsOptimizationRequirement(new_sz, fill)))</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (!sizeMeetsSafetyLimit(new_sz))</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> ((<span class="keyword">int</span>)node-&gt;count &lt; fill) <span class="comment">// 判断ziplist的元素个数是否超过了fill设置的大小</span></span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>总结</strong></p>
+<ol>
+<li><p>在Redis3.2版之前，Redis使用压缩列表和双向链表作为List的底层实现。当元素个数比较少并且元素长度比较小时，Redis使用压缩列表实现，否则Redis使用双向链表实现。</p>
+</li>
+<li><p>为了解决压缩列表在节点多的时候查找效率低的问题以及连锁更新问题，在Redis3.2版之后引入了quicklist，quicklist是一个双向链表，链表中的每一个节点是一个ziplist。</p>
+</li>
+<li><p>quicklist中限定了ziplist的大小，如果超过了限制的大小，新加入元素的时候会生成一个新的quicklistNode节点。</p>
+</li>
+<li><p>quicklist通过限定ziplist的大小来保证一个ziplist中的元素个数不会太多，如果需要连锁更新，也只在某个quicklistNode节点指向的ziplist中更新，不会引发整个链表的更新，以此来解决压缩列表存在的问题。</p>
+</li>
+</ol>
+<p><strong>参考</strong></p>
+<p>陈雷《Redis5设计与源码分析》</p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2021/09/16/【Redis】skiplist跳跃表/" rel="next" title="【Redis】skiplist跳跃表">
+                <i class="fa fa-chevron-left"></i> 【Redis】skiplist跳跃表
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">36</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">10</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Redis-List"><span class="nav-number">1.</span> <span class="nav-text">Redis List</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#quicklist"><span class="nav-number">1.1.</span> <span class="nav-text">quicklist</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#quicklist结构定义"><span class="nav-number">1.1.1.</span> <span class="nav-text">quicklist结构定义</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#quicklistNode结构定义"><span class="nav-number">1.1.2.</span> <span class="nav-text">quicklistNode结构定义</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#quicklist创建"><span class="nav-number">1.1.3.</span> <span class="nav-text">quicklist创建</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#添加元素"><span class="nav-number">1.1.4.</span> <span class="nav-text">添加元素</span></a></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

@@ -91,7 +91,7 @@
 <meta property="og:image" content="http://yoursite.com/images/redis哈希表.jpg">
 <meta property="og:image" content="http://yoursite.com/images/redis字典.jpg">
 <meta property="og:image" content="http://yoursite.com/images/hash冲突.jpg">
-<meta property="og:updated_time" content="2021-08-01T16:02:47.377Z">
+<meta property="og:updated_time" content="2021-09-19T06:37:53.902Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="【Redis】字典">
 <meta name="twitter:description" content="Redis 字典基本语法字典是Redis中的一种数据结构，底层使用哈希表实现，一个哈希表中可以存储多个键值对，它的语法如下，其中KEY为键，field和value为值（也是一个键值对）： 1HSET key field value 根据Key和field获取value： 1HGET key field 哈希表数据结构dicthtdictht是哈希表的数据结构定义：  table：哈希表数组，数组中">
@@ -378,6 +378,17 @@
 <p><strong>_dictRehashStep</strong></p>
 <p>_dictRehashStep中可以看到调用dictRehash时，每次迁移哈希桶的数量为1：</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="keyword">void</span> _dictRehashStep(dict *d) &#123;</span><br><span class="line">    <span class="keyword">if</span> (d-&gt;pauserehash == <span class="number">0</span>) dictRehash(d,<span class="number">1</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>总结</strong></p>
+<ol>
+<li><p>Redis字典底层使用哈希表实现。</p>
+</li>
+<li><p>键值对放入哈希表的时候，会根据key的值，计算hash值，出现哈希冲突的时候，Redis采用链式哈希解决冲突，使用链表将这些冲突的元素链起来。</p>
+</li>
+<li><p>由于Redis采用链式哈希解决冲突，那么在冲突频繁的场景下，链表会变得越来越长，这种情况下查找效率是比较低下的，需要遍历链表对比KEY的值来获取数据，为了处理效率低下的问题，需要对哈希表进行扩容，扩容的过程称为rehash。</p>
+</li>
+<li><p>当哈希表存储节点内容比较多时，进行rehas的时候主线程无法执行其他请求，造成阻塞，影响性能，所以采用了渐进式hash，渐进式hash并不会一次把旧节点全部拷贝到新的哈希表中，而是分多次渐进式的完成拷贝。</p>
+</li>
+</ol>
 <p><strong>参考</strong></p>
 <p>黄健宏《Redis设计与实现》</p>
 <p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
@@ -502,7 +513,7 @@
               
                 <a href="/archives/">
               
-                  <span class="site-state-item-count">37</span>
+                  <span class="site-state-item-count">36</span>
                   <span class="site-state-item-name">posts</span>
                 </a>
               </div>
