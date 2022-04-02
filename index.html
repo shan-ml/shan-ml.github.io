@@ -364,7 +364,7 @@
 <p>Java NIO中的FileChannel的transferTo方法将数据从FileChannel传输到另一个Channel：</p>
 <figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"> RandomAccessFile file = <span class="keyword">new</span> RandomAccessFile(<span class="keyword">new</span> File(<span class="string">"/Users/shanmenglu/test.txt"</span>), <span class="string">"r"</span>);</span><br><span class="line"><span class="comment">// 获取FileChannel</span></span><br><span class="line">FileChannel fileChannel = file.getChannel();</span><br><span class="line"><span class="keyword">long</span> size = fileChannel.size();</span><br><span class="line">SocketChannel socketChannel = SocketChannel.open(<span class="keyword">new</span> InetSocketAddress(<span class="string">"localhost"</span>, <span class="number">8080</span>));</span><br><span class="line">fileChannel.transferTo(<span class="number">0</span>,size,socketChannel);</span><br></pre></td></tr></table></figure>
 <p>使用FileChanel后的数据拷贝：</p>
-<p><img src="/images/filechanel.jpg" alt=""></p>
+<p><img src="/images/filechannel.jpg" alt=""></p>
 <p>Linux2.4版本之后通过对Socket Buffer添加一些Descriptor信息可以进一步减少数据的拷贝：</p>
 <p><img src="/images/零拷贝.jpg" alt=""></p>
 <p><strong>可以看到零拷贝并不是指的数据一次拷贝都没有发生，而是指没有通过CPU进行数据拷贝。</strong>Java中的堆外内存DirectByteBuffer和上面提到的mmap内存映射也是零拷贝中的一种，Netty中也提供了零拷贝相关的技术。</p>
@@ -2221,7 +2221,7 @@
 
     <footer id="footer" class="footer">
       <div class="footer-inner">
-        <div class="copyright">&copy; <span itemprop="copyrightYear">2021</span>
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
   <span class="with-love">
     <i class="fa fa-user"></i>
   </span>
