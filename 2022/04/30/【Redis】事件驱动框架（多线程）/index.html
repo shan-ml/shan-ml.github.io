@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="IO线程初始化Redis在6.0版本中引入了多线程，提高IO请求处理效率。 在Redis Server启动函数main（server.c文件）中初始化服务之后，又调用了InitServerLast函数：123456789101112int main(int argc, char **argv) &amp;#123;    // ...    // 初始化服务    initServer();    //">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】事件驱动源码分析（多线程）">
+<meta property="og:url" content="http://yoursite.com/2022/04/30/【Redis】事件驱动框架（多线程）/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="IO线程初始化Redis在6.0版本中引入了多线程，提高IO请求处理效率。 在Redis Server启动函数main（server.c文件）中初始化服务之后，又调用了InitServerLast函数：123456789101112int main(int argc, char **argv) &amp;#123;    // ...    // 初始化服务    initServer();    //">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/images/redisio线程初始化.jpg">
+<meta property="og:image" content="http://yoursite.com/images/redis数据读取过程.jpg">
+<meta property="og:image" content="http://yoursite.com/images/redis事件驱动框架多线程总结.png">
+<meta property="og:updated_time" content="2022-04-30T03:27:53.356Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】事件驱动源码分析（多线程）">
+<meta name="twitter:description" content="IO线程初始化Redis在6.0版本中引入了多线程，提高IO请求处理效率。 在Redis Server启动函数main（server.c文件）中初始化服务之后，又调用了InitServerLast函数：123456789101112int main(int argc, char **argv) &amp;#123;    // ...    // 初始化服务    initServer();    //">
+<meta name="twitter:image" content="http://yoursite.com/images/redisio线程初始化.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2022/04/30/【Redis】事件驱动框架（多线程）/"/>
+
+
+
+
+
+  <title>【Redis】事件驱动源码分析（多线程） | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2022/04/30/【Redis】事件驱动框架（多线程）/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】事件驱动源码分析（多线程）</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2022-04-30T11:00:00+08:00">
+                2022-04-30
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="IO线程初始化"><a href="#IO线程初始化" class="headerlink" title="IO线程初始化"></a>IO线程初始化</h2><p>Redis在6.0版本中引入了多线程，提高IO请求处理效率。</p>
+<p>在Redis Server启动函数main（server.c文件）中初始化服务之后，又调用了InitServerLast函数：<br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> **argv)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="comment">// 初始化服务</span></span><br><span class="line">    initServer();</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="comment">// InitServerLast</span></span><br><span class="line">    InitServerLast();</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="comment">// 事件循环</span></span><br><span class="line">    aeMain(server.el);</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>InitServerLast函数在server.c文件中，它调用了initThreadedIO函数对IO线程初始化：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">InitServerLast</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    bioInit();</span><br><span class="line">    <span class="comment">// 初始化IO线程</span></span><br><span class="line">    initThreadedIO();</span><br><span class="line">    set_jemalloc_bg_thread(server.jemalloc_bg_thread);</span><br><span class="line">    server.initial_memory_usage = zmalloc_used_memory();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>initThreadedIO</strong></p>
+<p>initThreadedIO的实现在networking.c文件中：</p>
+<ol>
+<li>初始化全局变量 server.io_threads_active线程活跃状态为0，表示未激活IO多线程</li>
+<li>对server.io_threads_num的值进行判断，io_threads_num表示设置的IO线程数量<ul>
+<li>如果线程数设置为1，表示不开启多线程直接返回即可</li>
+<li>如果线程数超过了IO_THREADS_MAX_NUM设置的最大值（128），则报错并停止redis服务</li>
+</ul>
+</li>
+<li>根据线程数的设置创建线程<ul>
+<li>初始化io_threads_list[i]，<strong>io_threads_list是一个数组，数组中的每一个元素是一个list，里面存储每个线程要处理的客户端列表</strong>，<strong>下标为0的元素也就是io_threads_lis[0]存储的是主线程要处理的客户端列表</strong>，这里先调用listCreate创建列表，为io_threads_list[i]初始化</li>
+<li>初始化io_threads_pending[i]为0，<strong>io_threads_pending数组存储每个线程等待处理的客户端个数</strong></li>
+<li>调用pthread_create创建线程，并传入了<strong>线程的运行函数IOThreadMain</strong>，之后将线程保存在io_threads中，<strong>io_threads数组存储了创建的线程描述符</strong></li>
+</ul>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">/* 初始化线程 */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">initThreadedIO</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    server.io_threads_active = <span class="number">0</span>; <span class="comment">/* 初始化线程活跃状态为0，表示未激活IO多线程 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果IO线程数为1，直接返回即可 */</span></span><br><span class="line">    <span class="keyword">if</span> (server.io_threads_num == <span class="number">1</span>) <span class="keyword">return</span>;</span><br><span class="line">    <span class="comment">/* 如果IO线程数超过了最大限制，打印错误，停止redis服务 */</span></span><br><span class="line">    <span class="keyword">if</span> (server.io_threads_num &gt; IO_THREADS_MAX_NUM) &#123;</span><br><span class="line">        serverLog(LL_WARNING,<span class="string">"Fatal: too many I/O threads configured. "</span></span><br><span class="line">                             <span class="string">"The maximum number is %d."</span>, IO_THREADS_MAX_NUM);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 根据线程数设置创建线程 */</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; server.io_threads_num; i++) &#123;</span><br><span class="line">        <span class="comment">/* 创建List */</span></span><br><span class="line">        io_threads_list[i] = listCreate();</span><br><span class="line">        <span class="keyword">if</span> (i == <span class="number">0</span>) <span class="keyword">continue</span>; <span class="comment">/* 下标为0的存储的是主线程 */</span></span><br><span class="line">        <span class="keyword">pthread_t</span> tid;</span><br><span class="line">        pthread_mutex_init(&amp;io_threads_mutex[i],<span class="literal">NULL</span>);</span><br><span class="line">        <span class="comment">// 初始化待处理的客户端数量为0</span></span><br><span class="line">        setIOPendingCount(i, <span class="number">0</span>);</span><br><span class="line">        pthread_mutex_lock(&amp;io_threads_mutex[i]); <span class="comment">/* Thread will be stopped. */</span></span><br><span class="line">        <span class="comment">// 创建线程, 线程的运行函数为IOThreadMain</span></span><br><span class="line">        <span class="keyword">if</span> (pthread_create(&amp;tid,<span class="literal">NULL</span>,IOThreadMain,(<span class="keyword">void</span>*)(<span class="keyword">long</span>)i) != <span class="number">0</span>) &#123;</span><br><span class="line">            serverLog(LL_WARNING,<span class="string">"Fatal: Can't initialize IO thread."</span>);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">/* 将创建的线程加入io_threads线程组中*/</span></span><br><span class="line">        io_threads[i] = tid;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// setIOPendingCount在networking.c文件</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">void</span> <span class="title">setIOPendingCount</span><span class="params">(<span class="keyword">int</span> i, <span class="keyword">unsigned</span> <span class="keyword">long</span> count)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 设置io_threads_pending[i]的值为count</span></span><br><span class="line">    atomicSetWithSync(io_threads_pending[i], count);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>io_threads_list</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* io_threads_list存储每个线程要处理的客户端 */</span></span><br><span class="line"><span class="built_in">list</span> *io_threads_list[IO_THREADS_MAX_NUM];</span><br></pre></td></tr></table></figure>
+<p><strong>io_threads</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 存储创建的线程*/</span></span><br><span class="line"><span class="keyword">pthread_t</span> io_threads[IO_THREADS_MAX_NUM];</span><br></pre></td></tr></table></figure>
+<p><strong>io_threads_pending</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 存储每个线程要等待处理的客户端个数 */</span></span><br><span class="line">redisAtomic <span class="keyword">unsigned</span> <span class="keyword">long</span> io_threads_pending[IO_THREADS_MAX_NUM];</span><br></pre></td></tr></table></figure>
+<p><strong>IO_THREADS_MAX_NUM定义</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> IO_THREADS_MAX_NUM 128</span></span><br></pre></td></tr></table></figure>
+<p><strong>初始化流程图</strong></p>
+<p><img src="/images/redisio线程初始化.jpg" alt=""></p>
+<h3 id="IO线程运行函数"><a href="#IO线程运行函数" class="headerlink" title="IO线程运行函数"></a>IO线程运行函数</h3><p>IO线程运行函数IOThreadMain在networking.c文件中，函数的入参传入的是线程id，它开启了一个while(1)循环，主要处理逻辑如下：</p>
+<ol>
+<li>从io_threads_list数组中获取当前线程id要处理的客户端列表，放入到列表迭代器li中</li>
+<li>遍历迭代器，获取每一个待处理的客户端client，根据io_threads_op线程的操作状态判断读写状态<ul>
+<li>如果是写状态，调用调用writeToClient处理</li>
+<li>如果是读状态，调用readQueryFromClient处理</li>
+</ul>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> *<span class="title">IOThreadMain</span><span class="params">(<span class="keyword">void</span> *myid)</span> </span>&#123;</span><br><span class="line">    <span class="comment">/* myid是线程ID，从0开始，到 server.iothreads_num-1，0号线程存储的是主线程 */</span></span><br><span class="line">    <span class="keyword">long</span> id = (<span class="keyword">unsigned</span> <span class="keyword">long</span>)myid;</span><br><span class="line">    <span class="keyword">char</span> thdname[<span class="number">16</span>];</span><br><span class="line"></span><br><span class="line">    <span class="built_in">snprintf</span>(thdname, <span class="keyword">sizeof</span>(thdname), <span class="string">"io_thd_%ld"</span>, id);</span><br><span class="line">    redis_set_thread_title(thdname);</span><br><span class="line">    redisSetCpuAffinity(server.server_cpulist);</span><br><span class="line">    makeThreadKillable();</span><br><span class="line">    <span class="comment">// 循环</span></span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> j = <span class="number">0</span>; j &lt; <span class="number">1000000</span>; j++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (getIOPendingCount(id) != <span class="number">0</span>) <span class="keyword">break</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">/* Give the main thread a chance to stop this thread. */</span></span><br><span class="line">        <span class="keyword">if</span> (getIOPendingCount(id) == <span class="number">0</span>) &#123;</span><br><span class="line">            pthread_mutex_lock(&amp;io_threads_mutex[id]);</span><br><span class="line">            pthread_mutex_unlock(&amp;io_threads_mutex[id]);</span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        serverAssert(getIOPendingCount(id) != <span class="number">0</span>);</span><br><span class="line">        </span><br><span class="line">        listIter li;</span><br><span class="line">        listNode *ln;</span><br><span class="line">        <span class="comment">// 获取每一个IO线程要处理的客户端，将其放入到迭代器li，这里的id指的线程id</span></span><br><span class="line">        listRewind(io_threads_list[id],&amp;li);</span><br><span class="line">        <span class="comment">// 遍历列表</span></span><br><span class="line">        <span class="keyword">while</span>((ln = listNext(&amp;li))) &#123;</span><br><span class="line">            <span class="comment">// 获取每一个待处理的客户端</span></span><br><span class="line">            client *c = listNodeValue(ln);</span><br><span class="line">            <span class="comment">// 如果是写事件</span></span><br><span class="line">            <span class="keyword">if</span> (io_threads_op == IO_THREADS_OP_WRITE) &#123;</span><br><span class="line">                <span class="comment">// 调用writeToClient处理</span></span><br><span class="line">                writeToClient(c,<span class="number">0</span>);</span><br><span class="line">            &#125; <span class="keyword">else</span> <span class="keyword">if</span> (io_threads_op == IO_THREADS_OP_READ) &#123;</span><br><span class="line">                <span class="comment">// 如果是读事件，调用readQueryFromClient</span></span><br><span class="line">                readQueryFromClient(c-&gt;conn);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                serverPanic(<span class="string">"io_threads_op value is unknown"</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        listEmpty(io_threads_list[id]);</span><br><span class="line">        <span class="comment">// 处理完毕后，io_threads_pending数组中对应的数量设置为0，表示所有客户端已处理完毕</span></span><br><span class="line">        setIOPendingCount(id, <span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>io_threads_list数组中存储了每一个线程要处理的客户端列表，在线程运行函数IOThreadMain中，获取待处理的客户端列表，遍历每一个客户端，根据读写类型调用不同的方法进行处理，接下来就去看下Redis在何时将待处理的客户端加入到io_threads_list列表中的。</p>
+<h2 id="延迟读写操作"><a href="#延迟读写操作" class="headerlink" title="延迟读写操作"></a>延迟读写操作</h2><p>Redis在处理客户端读事件和写事件时会根据一定条件推迟客户端的读取操作或者往客户端写数据操作，将待处理的读客户端和待处理的写客户端分别加入到全局变量server的clients_pending_read和clients_pending_write列表中，全局变量server对应的结构体为redisServer：</p>
+<p>全局变量server定义，在server.c文件：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 全局变量server */</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">redisServer</span> <span class="title">server</span>;</span></span><br></pre></td></tr></table></figure>
+<p>redisServer的结构体定义在server.h中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">redisServer</span> &#123;</span></span><br><span class="line">    </span><br><span class="line">    <span class="built_in">list</span> *clients_pending_write; <span class="comment">/* list类型，记录延迟写回数据的客户端 */</span></span><br><span class="line">    <span class="built_in">list</span> *clients_pending_read;  <span class="comment">/* list类型，记录延迟读取数据的客户端*/</span></span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="推迟客户端读操作"><a href="#推迟客户端读操作" class="headerlink" title="推迟客户端读操作"></a>推迟客户端读操作</h3><p><strong>readQueryFromClient</strong></p>
+<p>readQueryFromClient主要处理从客户端读取数据，在networking.c中实现，里面调用了postponeClientRead函数判断是否需要推迟客户端的读取操作 ：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">readQueryFromClient</span><span class="params">(connection *conn)</span> </span>&#123;</span><br><span class="line">    client *c = connGetPrivateData(conn);</span><br><span class="line">    <span class="keyword">int</span> nread, readlen;</span><br><span class="line">    <span class="keyword">size_t</span> qblen;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 判断是否需要推迟客户端的读取操作 */</span></span><br><span class="line">    <span class="keyword">if</span> (postponeClientRead(c)) <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">  </span><br><span class="line">    <span class="comment">// 处理数据执行命令</span></span><br><span class="line">    processInputBuffer(c);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>postponeClientRead</strong></p>
+<p>postponeClientRead函数用于判断是否延迟从客户端读取数据，包含四个条件：</p>
+<ol>
+<li>server.io_threads_active为1，表示激活了IO多线程</li>
+<li>server.io_threads_do_reads为1，表示IO多线程可以延迟执行客户端的读取操作，在配置文件中定义，可以通过修改配置文件来开启延迟读取客户端数据</li>
+<li>ProcessingEventsWhileBlocked值为0，processEventsWhileBlokced函数在执行时会将ProcessingEventsWhileBlocked的值置为1，执行完毕后置为0，Redis在读取RDB或者AOF文件时会调用processEventsWhileBlokced函数，<strong>为了避免读取RDB或AOF文件时阻塞无法及时处理请求，processEventsWhileBlokced函数在执行时不能推迟客户端数据读取。</strong></li>
+<li>客户端的现有标识不能有CLIENT_MASTER、CLIENT_SLAVE、CLIENT_PENDING_READ、CLIENT_BLOCKED等状态<ul>
+<li>CLIENT_MASTER、CLIENT_SLAVE表示是用于主从复制的客户端</li>
+<li>CLIENT_PENDING_READ表示客户端本身已经是推迟读取状态</li>
+<li>CLIENT_BLOCKED表示客户端是阻塞状态</li>
+</ul>
+</li>
+</ol>
+<p><strong>满足以上四个条件时将推迟从客户端读取数据，会将客户端标识置为CLIENT_PENDING_READ延迟读状态，并将待读取数据的客户端client加入到server.clients_pending_read中。</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">postponeClientRead</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (server.io_threads_active &amp;&amp;</span><br><span class="line">        server.io_threads_do_reads &amp;&amp;</span><br><span class="line">        !ProcessingEventsWhileBlocked &amp;&amp;</span><br><span class="line">        !(c-&gt;flags &amp; (CLIENT_MASTER|CLIENT_SLAVE|CLIENT_PENDING_READ|CLIENT_BLOCKED))) </span><br><span class="line">    &#123;</span><br><span class="line">        c-&gt;flags |= CLIENT_PENDING_READ;</span><br><span class="line">        <span class="comment">// 将客户端加入到clients_pending_read链表中</span></span><br><span class="line">        listAddNodeHead(server.clients_pending_read,c);</span><br><span class="line">        <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="推迟客户端写操作"><a href="#推迟客户端写操作" class="headerlink" title="推迟客户端写操作"></a>推迟客户端写操作</h3><p>在往客户端写数据的addReply（networking.c）函数中，调用了prepareClientToWrite判断是否准备往客户端写数据：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">addReply</span><span class="params">(client *c, robj *obj)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 调用prepareClientToWrite往客户端写数据</span></span><br><span class="line">    <span class="keyword">if</span> (prepareClientToWrite(c) != C_OK) <span class="keyword">return</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (sdsEncodedObject(obj)) &#123;</span><br><span class="line">        <span class="keyword">if</span> (_addReplyToBuffer(c,obj-&gt;ptr,sdslen(obj-&gt;ptr)) != C_OK)</span><br><span class="line">            _addReplyProtoToList(c,obj-&gt;ptr,sdslen(obj-&gt;ptr));</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (obj-&gt;encoding == OBJ_ENCODING_INT) &#123;</span><br><span class="line">        <span class="keyword">char</span> buf[<span class="number">32</span>];</span><br><span class="line">        <span class="keyword">size_t</span> len = ll2string(buf,<span class="keyword">sizeof</span>(buf),(<span class="keyword">long</span>)obj-&gt;ptr);</span><br><span class="line">        <span class="keyword">if</span> (_addReplyToBuffer(c,buf,len) != C_OK)</span><br><span class="line">            _addReplyProtoToList(c,buf,len);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        serverPanic(<span class="string">"Wrong obj-&gt;encoding in addReply()"</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>prepareClientToWrite</strong></p>
+<p>prepareClientToWrite（networking.c）中，首先对客户端标识状态进行了一系列的判断，然后调用了clientHasPendingReplies函数判断输出缓冲区是否有还有数据等待写回到客户端，如果没有，判断客户端的标识是否是CLIENT_PENDING_READ已延迟读，如果不是CLIENT_PENDING_READ状态，调用clientInstallWriteHandler处理：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">prepareClientToWrite</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; (CLIENT_LUA|CLIENT_MODULE)) <span class="keyword">return</span> C_OK;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_CLOSE_ASAP) <span class="keyword">return</span> C_ERR;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; (CLIENT_REPLY_OFF|CLIENT_REPLY_SKIP)) <span class="keyword">return</span> C_ERR;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> ((c-&gt;flags &amp; CLIENT_MASTER) &amp;&amp;</span><br><span class="line">        !(c-&gt;flags &amp; CLIENT_MASTER_FORCE_REPLY)) <span class="keyword">return</span> C_ERR;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!c-&gt;conn) <span class="keyword">return</span> C_ERR; </span><br><span class="line"></span><br><span class="line">    <span class="comment">/* </span></span><br><span class="line"><span class="comment">     * 如果缓冲区的数据都已写回到客户端并且客户端标识不是推迟读状态</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="keyword">if</span> (!clientHasPendingReplies(c) &amp;&amp; !(c-&gt;flags &amp; CLIENT_PENDING_READ))</span><br><span class="line">            clientInstallWriteHandler(c);<span class="comment">// 调用clientInstallWriteHandler</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> C_OK;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>clientInstallWriteHandler</strong></p>
+<p>clientInstallWriteHandler（networking.c）函数中<strong>对是否推迟客户端写操作进行了判断</strong>：</p>
+<ol>
+<li>客户端标识不是CLIENT_PENDING_WRITE，对应条件为!(c-&gt;flags &amp; CLIENT_PENDING_WRITE)，表示客户端本身不是推迟写状态</li>
+<li>客户端未在进行主从复制（对应条件为c-&gt;replstate == REPL_STATE_NONE） 或者 客户端是主从复制的从节点，但全量复制的 RDB 文件已经传输完成，客户端可以接收请求（对应条件 !c-&gt;repl_put_online_on_ack)）</li>
+</ol>
+<p><strong>满足以上两个条件时将推迟客户端写操作，将客户端的标识置为延迟写CLIENT_PENDING_WRITE状态，并将客户端加入到待写回的列表server.clients_pending_write中。</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clientInstallWriteHandler</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="comment">/* 如果客户端的标识不是推迟写状态，并且客户端未在进行主从复制或者客户端是主从复制的从节点并能接收请求 */</span></span><br><span class="line">    <span class="keyword">if</span> (!(c-&gt;flags &amp; CLIENT_PENDING_WRITE) &amp;&amp;</span><br><span class="line">        (c-&gt;replstate == REPL_STATE_NONE ||</span><br><span class="line">         (c-&gt;replstate == SLAVE_STATE_ONLINE &amp;&amp; !c-&gt;repl_put_online_on_ack)))</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* 将客户端的标识置为延迟写 */</span></span><br><span class="line">        c-&gt;flags |= CLIENT_PENDING_WRITE;</span><br><span class="line">        <span class="comment">// 将客户端加入到待写回的列表clients_pending_write中</span></span><br><span class="line">        listAddNodeHead(server.clients_pending_write,c);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="IO线程的分配"><a href="#IO线程的分配" class="headerlink" title="IO线程的分配"></a>IO线程的分配</h2><p>上面我们已经知道了IO线程的初始化、IO线程的运行函数IOThreadMain主要处理逻辑，以及延迟读写的客户端是何时分别加入到server全局变量的clients_pending_read和clients_pending_write中的，接下来去看下时何时为客户端分配线程。</p>
+<p>在aeProcessEvents处理事件的函数中，等待事件产生之前，调用了beforeSleep（networking.c）方法，beforeSleep中又调用了<strong>handleClientsWithPendingReadsUsingThreads为延迟读取操作的客户端分配线程</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">beforeSleep</span><span class="params">(struct aeEventLoop *eventLoop)</span> </span>&#123;</span><br><span class="line">    UNUSED(eventLoop);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    </span><br><span class="line">    handleBlockedClientsTimeout();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 调用了handleClientsWithPendingReadsUsingThreads为延迟读客户端分配线程 */</span></span><br><span class="line">    handleClientsWithPendingReadsUsingThreads();</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* 调用了handleClientsWithPendingWritesUsingThreads为延迟写客户端分配线程 */</span></span><br><span class="line">    handleClientsWithPendingWritesUsingThreads();</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="延迟读操作的客户端分配线程"><a href="#延迟读操作的客户端分配线程" class="headerlink" title="延迟读操作的客户端分配线程"></a>延迟读操作的客户端分配线程</h3><p><strong>handleClientsWithPendingReadsUsingThreads</strong></p>
+<p>handleClientsWithPendingReadsUsingThreads（networking.c）主要逻辑如下：</p>
+<ol>
+<li><p>从server.clients_pending_read获取延迟读取操作的客户端，将其加入到迭代列表</p>
+</li>
+<li><p>遍历延迟读操作的客户端列表，获取每一个待处理的客户端client，item_id表示每个客户端的序号，从0开始，每处理一个客户端就增1，用序号对线程数server.io_threads_num取模，得到一个target_id，客户端会被加入到io_threads_list[target_id]对应的列表中，<strong>也就是使用取模的方式轮询为每一个客户端分配对应线程，然后将客户端加入到该线程待处理的客户端列表中，此时客户端已分配到线程，在线程的运行函数IOThreadMain会调用readQueryFromClient处理客户端数据，需要注意多线程只是从客户端数据读取数据解析命令，并不会执行命令</strong>,在processInputBuffer中可以看到在IO多线程下只会将flags状态标记为CLIENT_PENDING_COMMAND，不会执行processCommandAndResetClient函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"> <span class="function"><span class="keyword">void</span> <span class="title">processInputBuffer</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">while</span>(c-&gt;qb_pos &lt; sdslen(c-&gt;querybuf)) &#123;</span><br><span class="line">        <span class="comment">// 省略...</span></span><br><span class="line">        <span class="keyword">if</span> (c-&gt;argc == <span class="number">0</span>) &#123;</span><br><span class="line">            resetClient(c);</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">/* 在IO多线程情况下不能在这里执行命令，所以在这里将client标记为CLIENT_PENDING_COMMAND然后返回，等待主线程同步执行命令 */</span></span><br><span class="line">            <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_PENDING_READ) &#123;</span><br><span class="line">                c-&gt;flags |= CLIENT_PENDING_COMMAND;</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">/* 准备执行命令 */</span></span><br><span class="line">            <span class="keyword">if</span> (processCommandAndResetClient(c) == C_ERR) &#123;</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>将io_threads_op线程操作状态置为读操作</p>
+</li>
+<li><p>遍历线程数，获取每一个线程要处理的客户端个数，将其设置到线程对应的io_threads_pending[j]中，<strong>io_threads_pending数组中记录了每个线程等待处理的客户端个数</strong></p>
+</li>
+<li><p>获取io_threads_list[0]中待处理的客户端列表，io_threads_list[0]存储的是主线程的数据，<strong>因为当前执行handleClientsWithPendingReadsUsingThreads函数的线程正是主线程，所以让主线程来处理io_threads_list[0]中存放的待处理客户端</strong></p>
+</li>
+<li><p>主线程遍历io_threads_list[0]中每一个待处理的客户端，调用readQueryFromClient处理，从客户端读取数据</p>
+</li>
+<li><p>主线程开启一个while(1)循环等待其他IO线程处理完毕，结束条件是pending为0，pending记录了所有线程要处理的客户端数量总和，<strong>在前面IOThreadMain函数中可以看到线程在处理完毕之后会将对应io_threads_pending数组中记录的个数置为0，当pending为0表示所有的线程都已将各自复制的客户端数据处理完毕</strong></p>
+</li>
+<li><p>主线程开启while循环<strong>准备执行客户端命令（注意这里才开始执行命令，多线程只负责解析不负责执行）</strong>，循环条件是server.clients_pending_read列表的长度不为0，主线程需要保证客户端的请求顺序，所从clients_pending_read列表中的第一个元素开始向后遍历：</p>
+<p>（1）调用listNodeValue获取列表中的元素，也就是待处理的客户端client</p>
+<p>（2）调用listDelNode将获取到的元素从列表删除，因为在第7步中，<strong>主线程已经等待其他所有的线程执行完毕，此时所有的线程已经将各自负责的客户端数据处理完成</strong>，所以可以将客户端从server.clients_pending_read中移除</p>
+<p>（3）<strong>调用processPendingCommandsAndResetClient函数判断客户端标识是否是CLIENT_PENDING_COMMAND状态，CLIENT_PENDING_COMMAND状态表示客户端的请求命令已经被IO线程解析（processInputBuffer方法中可以看到状态被标记为CLIENT_PENDING_COMMAND），可以开始执行命令，接着调用processCommandAndResetClient函数执行客户端发送的请求命令</strong></p>
+<p>（4）<strong>由于客户端输入缓冲区可能有其他的命令未读取，这里调用processInputBuffer处理输入缓冲区数据继续解析命令并执行</strong></p>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">handleClientsWithPendingReadsUsingThreads</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (!server.io_threads_active || !server.io_threads_do_reads) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">int</span> processed = listLength(server.clients_pending_read);</span><br><span class="line">    <span class="keyword">if</span> (processed == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    listIter li;</span><br><span class="line">    listNode *ln;</span><br><span class="line">    <span class="comment">// 获取待读取的客户端列表clients_pending_read加入到迭代链表中</span></span><br><span class="line">    listRewind(server.clients_pending_read,&amp;li);</span><br><span class="line">    <span class="keyword">int</span> item_id = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 遍历待读取的客户端</span></span><br><span class="line">    <span class="keyword">while</span>((ln = listNext(&amp;li))) &#123;</span><br><span class="line">        <span class="comment">// 获取客户端</span></span><br><span class="line">        client *c = listNodeValue(ln);</span><br><span class="line">        <span class="comment">// 根据线程数取模，轮询分配线程</span></span><br><span class="line">        <span class="keyword">int</span> target_id = item_id % server.io_threads_num;</span><br><span class="line">        <span class="comment">// 分配线程，加入到线程对应的io_threads_list</span></span><br><span class="line">        listAddNodeTail(io_threads_list[target_id],c);</span><br><span class="line">        item_id++;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将线程的操作状态置为读操作*/</span></span><br><span class="line">    io_threads_op = IO_THREADS_OP_READ;</span><br><span class="line">    <span class="comment">// 遍历线程数</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; server.io_threads_num; j++) &#123;</span><br><span class="line">        <span class="comment">// 获取每个线程待处理客户端的个数</span></span><br><span class="line">        <span class="keyword">int</span> count = listLength(io_threads_list[j]);</span><br><span class="line">        <span class="comment">// 将待处理客户端的个数设置到线程对应的io_threads_pending[j]中，io_threads_pending数组中记录了每个线程要处理的客户端个数</span></span><br><span class="line">        setIOPendingCount(j, count);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 获取io_threads_list[0]中待处理的客户端列表，io_threads_list[0]存储的是主线程的数据*/</span></span><br><span class="line">     <span class="comment">/* handleClientsWithPendingReadsUsingThreads函数的执行者刚好就是主线程，所以让主线程处理io_threads_list[0]中的数据*/</span></span><br><span class="line">    listRewind(io_threads_list[<span class="number">0</span>],&amp;li);</span><br><span class="line">    <span class="keyword">while</span>((ln = listNext(&amp;li))) &#123;</span><br><span class="line">        client *c = listNodeValue(ln);</span><br><span class="line">        <span class="comment">// 调用readQueryFromClient</span></span><br><span class="line">        readQueryFromClient(c-&gt;conn);</span><br><span class="line">    &#125;</span><br><span class="line">    listEmpty(io_threads_list[<span class="number">0</span>]);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 等待其他线程处理完毕 */</span></span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="keyword">unsigned</span> <span class="keyword">long</span> pending = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; server.io_threads_num; j++)</span><br><span class="line">            <span class="comment">// 获取每一个客户端处理的客户端个数</span></span><br><span class="line">            pending += getIOPendingCount(j);</span><br><span class="line">        <span class="comment">// 如果为0表示所有线程对应的客户端都处理完毕</span></span><br><span class="line">        <span class="keyword">if</span> (pending == <span class="number">0</span>) <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 再次判断server.clients_pending_read是否有待处理的客户端*/</span></span><br><span class="line">    <span class="keyword">while</span>(listLength(server.clients_pending_read)) &#123;</span><br><span class="line">        <span class="comment">// 获取列表第一个元素</span></span><br><span class="line">        ln = listFirst(server.clients_pending_read);</span><br><span class="line">        <span class="comment">// 获取客户端</span></span><br><span class="line">        client *c = listNodeValue(ln);</span><br><span class="line">        c-&gt;flags &amp;= ~CLIENT_PENDING_READ;</span><br><span class="line">        <span class="comment">// 删除节点</span></span><br><span class="line">        listDelNode(server.clients_pending_read,ln);</span><br><span class="line"></span><br><span class="line">        serverAssert(!(c-&gt;flags &amp; CLIENT_BLOCKED));</span><br><span class="line">        <span class="comment">// processPendingCommandsAndResetClient函数中会判断客户端标识是否是CLIENT_PENDING_COMMAND状态，如果是调用processCommandAndResetClient函数处理请求命令</span></span><br><span class="line">        <span class="keyword">if</span> (processPendingCommandsAndResetClient(c) == C_ERR) &#123;</span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 由于客户端输入缓冲区可能有其他的命令未读取，这里解析命令并执行</span></span><br><span class="line">        processInputBuffer(c);</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (!(c-&gt;flags &amp; CLIENT_PENDING_WRITE) &amp;&amp; clientHasPendingReplies(c))</span><br><span class="line">            clientInstallWriteHandler(c);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* Update processed count on server */</span></span><br><span class="line">    server.stat_io_reads_processed += processed;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> processed;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>processPendingCommandsAndResetClient</strong></p>
+<p>processPendingCommandsAndResetClient函数在networking.c中，它先判断客户端标识是否是CLIENT_PENDING_COMMAND状态，CLIENT_PENDING_COMMAND状态表示客户端的请求命令已经被IO线程解析，可以被执行，所以如果处于CLIENT_PENDING_COMMAND状态，接下来会调用processCommandAndResetClient函数处理客户端命令，具体是调用processCommand函数执行命令的：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/*processPendingCommandsAndResetClient函数（networking.c中） */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">processPendingCommandsAndResetClient</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 判断客户端标识是否是CLIENT_PENDING_COMMAND</span></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_PENDING_COMMAND) &#123;</span><br><span class="line">        <span class="comment">// 取消CLIENT_PENDING_COMMAND状态</span></span><br><span class="line">        c-&gt;flags &amp;= ~CLIENT_PENDING_COMMAND;</span><br><span class="line">        <span class="comment">// 调用processCommandAndResetClient执行命令</span></span><br><span class="line">        <span class="keyword">if</span> (processCommandAndResetClient(c) == C_ERR) &#123;</span><br><span class="line">            <span class="keyword">return</span> C_ERR;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> C_OK;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* processCommandAndResetClient函数（networking.c中） */</span></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">processCommandAndResetClient</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> deadclient = <span class="number">0</span>;</span><br><span class="line">    client *old_client = server.current_client;</span><br><span class="line">    server.current_client = c;</span><br><span class="line">    <span class="comment">// 调用processCommand执行命令</span></span><br><span class="line">    <span class="keyword">if</span> (processCommand(c) == C_OK) &#123;</span><br><span class="line">        commandProcessed(c);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (server.current_client == <span class="literal">NULL</span>) deadclient = <span class="number">1</span>;</span><br><span class="line">    server.current_client = old_client;</span><br><span class="line">    <span class="keyword">return</span> deadclient ? C_ERR : C_OK;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>processCommand</strong></p>
+<p>processCommand函数在server.c文件中，它调用了addReply函数将需要返回给客户端的数据先写入缓冲区：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">processCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">0</span>]-&gt;ptr,<span class="string">"quit"</span>)) &#123;</span><br><span class="line">        <span class="comment">// 调用addReply函数将需要返回给客户端的数据先写入缓冲区</span></span><br><span class="line">        addReply(c,shared.ok);</span><br><span class="line">        c-&gt;flags |= CLIENT_CLOSE_AFTER_REPLY;</span><br><span class="line">        <span class="keyword">return</span> C_ERR;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>数据读取的整体过程如下，<strong>IO多线程只是负责从客户端读取数据解析命令，执行命令的过程仍然是单线程的</strong>：</p>
+<p><img src="/images/redis数据读取过程.jpg" alt=""></p>
+<h3 id="延迟写操作的客户端分配线程"><a href="#延迟写操作的客户端分配线程" class="headerlink" title="延迟写操作的客户端分配线程"></a>延迟写操作的客户端分配线程</h3><p><strong>handleClientsWithPendingWritesUsingThreads</strong></p>
+<p>延迟写操作的客户端分配线程在handleClientsWithPendingWritesUsingThreads中实现（networking.c），处理逻辑与handleClientsWithPendingReadsUsingThreads类似：</p>
+<ol>
+<li><p>从server.clients_pending_write获取延迟写操作的客户端，将其加入到迭代列表</p>
+</li>
+<li><p>遍历延迟写操作的客户端列表，获取每一个待处理的客户端client，<strong>使用取模的方式轮询为每一个客户端分配线程，然后将客户端加入到该线程待处理的客户端列表中，此时客户端已分配到线程，在线程的运行函数IOThreadMain会处待写回数据的客户端</strong></p>
+</li>
+<li><p>将io_threads_op线程操作状态置为写操作</p>
+</li>
+<li><p>遍历线程数，获取每一个线程要处理的客户端个数，将其设置到线程对应的io_threads_pending[j]中，<strong>io_threads_pending数组中记录了每个线程等待处理的客户端个数</strong></p>
+</li>
+<li><p>获取io_threads_list[0]中待处理的客户端列表，io_threads_list[0]存储的是主线程的数据，<strong>因为当前执行handleClientsWithPendingWritesUsingThreads函数的线程正是主线程，所以让主线程来处理io_threads_list[0]中存放的待处理客户端</strong></p>
+</li>
+<li><p>主线程遍历io_threads_list[0]中每一个待处理的客户端，调用writeToClient往客户端写数据</p>
+</li>
+<li><p>主线程开启一个while(1)循环等待其他IO线程处理完毕</p>
+</li>
+<li><p>主线程开启while循环，循环条件是server.clients_pending_write列表的长度不为0，遍历clients_pending_write中待处理的写客户端：</p>
+<p>（1）调用listNodeValue获取待处理的客户端client</p>
+<p>（2）<strong>判断缓冲区数据是否全部写回到客户端，如果未全部写回调用connSetWriteHandler向内核注册写事件监听，回调函数为sendReplyToClient，待事件循环流程再次执行时，注册的可写事件会通过回调函数sendReplyToClient 处理，把缓冲区中的数据写回客户端。</strong></p>
+</li>
+<li><p>调用listEmpty函数清空server.clients_pending_write列表</p>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">handleClientsWithPendingWritesUsingThreads</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> processed = listLength(server.clients_pending_write);</span><br><span class="line">    <span class="keyword">if</span> (processed == <span class="number">0</span>) <span class="keyword">return</span> <span class="number">0</span>; </span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (server.io_threads_num == <span class="number">1</span> || stopThreadedIOIfNeeded()) &#123;</span><br><span class="line">        <span class="keyword">return</span> handleClientsWithPendingWrites();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (!server.io_threads_active) startThreadedIO();</span><br><span class="line"></span><br><span class="line">    listIter li;</span><br><span class="line">    listNode *ln;</span><br><span class="line">    <span class="comment">// 获取待写回客户端列表clients_pending_write加入到迭代链表中</span></span><br><span class="line">    listRewind(server.clients_pending_write,&amp;li);</span><br><span class="line">    <span class="keyword">int</span> item_id = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 遍历待写的客户端</span></span><br><span class="line">    <span class="keyword">while</span>((ln = listNext(&amp;li))) &#123;</span><br><span class="line">        client *c = listNodeValue(ln);</span><br><span class="line">        c-&gt;flags &amp;= ~CLIENT_PENDING_WRITE;</span><br><span class="line">        <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_CLOSE_ASAP) &#123;</span><br><span class="line">            listDelNode(server.clients_pending_write, ln);</span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 根据线程数取模，轮询分配线程</span></span><br><span class="line">        <span class="keyword">int</span> target_id = item_id % server.io_threads_num;</span><br><span class="line">         <span class="comment">// 分配线程，加入到对应线程的io_threads_list</span></span><br><span class="line">        listAddNodeTail(io_threads_list[target_id],c);</span><br><span class="line">        item_id++;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将io_threads_op线程操作状态置为写操作 */</span></span><br><span class="line">    io_threads_op = IO_THREADS_OP_WRITE;</span><br><span class="line">    <span class="keyword">for</span> (<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; server.io_threads_num; j++) &#123;</span><br><span class="line">        <span class="keyword">int</span> count = listLength(io_threads_list[j]);</span><br><span class="line">        <span class="comment">// 设置每个线程需要处理的客户端个数</span></span><br><span class="line">        setIOPendingCount(j, count);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">  </span><br><span class="line">    <span class="comment">/* 获取io_threads_list[0]中待处理的客户端列表，io_threads_list[0]存储的是主线程的数据*/</span></span><br><span class="line">    <span class="comment">/* handleClientsWithPendingWritesUsingThreads函数的执行者刚好就是主线程，所以让主线程处理io_threads_list[0]中的数据*/</span></span><br><span class="line">    listRewind(io_threads_list[<span class="number">0</span>],&amp;li);</span><br><span class="line">    <span class="keyword">while</span>((ln = listNext(&amp;li))) &#123;</span><br><span class="line">        client *c = listNodeValue(ln);</span><br><span class="line">        <span class="comment">// 调用writeToClient往客户写数据</span></span><br><span class="line">        writeToClient(c,<span class="number">0</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    listEmpty(io_threads_list[<span class="number">0</span>]);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 等待其他线程处理完毕 */</span></span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>) &#123;</span><br><span class="line">        <span class="keyword">unsigned</span> <span class="keyword">long</span> pending = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> j = <span class="number">1</span>; j &lt; server.io_threads_num; j++)</span><br><span class="line">            pending += getIOPendingCount(j);</span><br><span class="line">        <span class="keyword">if</span> (pending == <span class="number">0</span>) <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">     <span class="comment">/* 再次获取server.clients_pending_read所有待写的客户端*/</span></span><br><span class="line">    listRewind(server.clients_pending_write,&amp;li);</span><br><span class="line">    <span class="comment">// 遍历</span></span><br><span class="line">    <span class="keyword">while</span>((ln = listNext(&amp;li))) &#123;</span><br><span class="line">        client *c = listNodeValue(ln);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果缓冲区数据未全部写回调用connSetWriteHandler注册可写事件，回调函数为sendReplyToClient*/</span></span><br><span class="line">        <span class="keyword">if</span> (clientHasPendingReplies(c) &amp;&amp;</span><br><span class="line">                connSetWriteHandler(c-&gt;conn, sendReplyToClient) == AE_ERR)</span><br><span class="line">        &#123;</span><br><span class="line">            freeClientAsync(c);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 清空clients_pending_write</span></span><br><span class="line">    listEmpty(server.clients_pending_write);</span><br><span class="line"></span><br><span class="line">    server.stat_io_writes_processed += processed;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> processed;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>connSetWriteHandler</strong></p>
+<p>connSetWriteHandler函数在connection.c文件中，它通过set_write_handler注册了写handler，set_write_handler对应的是connSocketSetWriteHandler函数，<strong>所以connSetWriteHandler会被映射为connSocketSetWriteHandler，connSocketSetWriteHandler函数调用了aeCreateFileEvent向内核中注册可写事件监听，上面可知回调函数为sendReplyToClient</strong> ，等事件循环流程再次执行时，handleClientsWithPendingWritesUsingThreads 函数注册的可写事件会通过回调函数sendReplyToClient 处理，把缓冲区中的数据写回客户端。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line">ConnectionType CT_Socket = &#123;</span><br><span class="line">    .ae_handler = connSocketEventHandler,</span><br><span class="line">    .close = connSocketClose,</span><br><span class="line">    .write = connSocketWrite,</span><br><span class="line">    .read = connSocketRead,</span><br><span class="line">    .accept = connSocketAccept,</span><br><span class="line">    .connect = connSocketConnect,</span><br><span class="line">    .set_write_handler = connSocketSetWriteHandler, <span class="comment">// set_write_handler对应connSocketSetWriteHandler函数</span></span><br><span class="line">    .set_read_handler = connSocketSetReadHandler,</span><br><span class="line">    .get_last_error = connSocketGetLastError,</span><br><span class="line">    .blocking_connect = connSocketBlockingConnect,</span><br><span class="line">    .sync_write = connSocketSyncWrite,</span><br><span class="line">    .sync_read = connSocketSyncRead,</span><br><span class="line">    .sync_readline = connSocketSyncReadLine,</span><br><span class="line">    .get_type = connSocketGetType</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* </span></span><br><span class="line"><span class="comment"> * connSetWriteHandler</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">int</span> <span class="title">connSetWriteHandler</span><span class="params">(connection *conn, ConnectionCallbackFunc func)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 注册写handler, set_write_handler对应的是connSocketSetWriteHandler函数</span></span><br><span class="line">    <span class="keyword">return</span> conn-&gt;type-&gt;set_write_handler(conn, func, <span class="number">0</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* </span></span><br><span class="line"><span class="comment"> * connSocketSetWriteHandler注册写事件</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">connSocketSetWriteHandler</span><span class="params">(connection *conn, ConnectionCallbackFunc func, <span class="keyword">int</span> barrier)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (func == conn-&gt;write_handler) <span class="keyword">return</span> C_OK;</span><br><span class="line"></span><br><span class="line">    conn-&gt;write_handler = func;</span><br><span class="line">    <span class="keyword">if</span> (barrier)</span><br><span class="line">        conn-&gt;flags |= CONN_FLAG_WRITE_BARRIER;</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        conn-&gt;flags &amp;= ~CONN_FLAG_WRITE_BARRIER;</span><br><span class="line">    <span class="keyword">if</span> (!conn-&gt;write_handler)</span><br><span class="line">        aeDeleteFileEvent(server.el,conn-&gt;fd,AE_WRITABLE);</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        <span class="keyword">if</span> (aeCreateFileEvent(server.el,conn-&gt;fd,AE_WRITABLE, <span class="comment">// 向内核注册写事件</span></span><br><span class="line">                    conn-&gt;type-&gt;ae_handler,conn) == AE_ERR) <span class="keyword">return</span> C_ERR;</span><br><span class="line">    <span class="keyword">return</span> C_OK;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>总结</strong><br><img src="/images/redis事件驱动框架多线程总结.png" alt=""></p>
+<p><strong>参考</strong></p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2022/04/25/【Redis】事件驱动框架/" rel="next" title="【Redis】事件驱动源码分析">
+                <i class="fa fa-chevron-left"></i> 【Redis】事件驱动源码分析
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">47</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#IO线程初始化"><span class="nav-number">1.</span> <span class="nav-text">IO线程初始化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#IO线程运行函数"><span class="nav-number">1.1.</span> <span class="nav-text">IO线程运行函数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#延迟读写操作"><span class="nav-number">2.</span> <span class="nav-text">延迟读写操作</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#推迟客户端读操作"><span class="nav-number">2.1.</span> <span class="nav-text">推迟客户端读操作</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#推迟客户端写操作"><span class="nav-number">2.2.</span> <span class="nav-text">推迟客户端写操作</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#IO线程的分配"><span class="nav-number">3.</span> <span class="nav-text">IO线程的分配</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#延迟读操作的客户端分配线程"><span class="nav-number">3.1.</span> <span class="nav-text">延迟读操作的客户端分配线程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#延迟写操作的客户端分配线程"><span class="nav-number">3.2.</span> <span class="nav-text">延迟写操作的客户端分配线程</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
