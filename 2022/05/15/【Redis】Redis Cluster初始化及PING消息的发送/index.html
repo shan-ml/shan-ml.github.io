@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Cluster消息类型定义 1234#define CLUSTERMSG_TYPE_PING 0          /* Ping消息类型，节点间进行通信交换信息的消息 */#define CLUSTERMSG_TYPE_PONG 1          /* Pong消息类型 (Ping命令的回复) */#define CLUSTERMSG_TYPE_MEET 2          /* Meet">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】Redis Cluster初始化及PING消息的发送">
+<meta property="og:url" content="http://yoursite.com/2022/05/15/【Redis】Redis Cluster初始化及PING消息的发送/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="Cluster消息类型定义 1234#define CLUSTERMSG_TYPE_PING 0          /* Ping消息类型，节点间进行通信交换信息的消息 */#define CLUSTERMSG_TYPE_PONG 1          /* Pong消息类型 (Ping命令的回复) */#define CLUSTERMSG_TYPE_MEET 2          /* Meet">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/images/集群初始化.png">
+<meta property="og:updated_time" content="2022-05-29T12:20:23.477Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】Redis Cluster初始化及PING消息的发送">
+<meta name="twitter:description" content="Cluster消息类型定义 1234#define CLUSTERMSG_TYPE_PING 0          /* Ping消息类型，节点间进行通信交换信息的消息 */#define CLUSTERMSG_TYPE_PONG 1          /* Pong消息类型 (Ping命令的回复) */#define CLUSTERMSG_TYPE_MEET 2          /* Meet">
+<meta name="twitter:image" content="http://yoursite.com/images/集群初始化.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2022/05/15/【Redis】Redis Cluster初始化及PING消息的发送/"/>
+
+
+
+
+
+  <title>【Redis】Redis Cluster初始化及PING消息的发送 | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2022/05/15/【Redis】Redis Cluster初始化及PING消息的发送/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】Redis Cluster初始化及PING消息的发送</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2022-05-15T23:00:00+08:00">
+                2022-05-15
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Cluster消息类型定义</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLUSTERMSG_TYPE_PING 0          <span class="comment">/* Ping消息类型，节点间进行通信交换信息的消息 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLUSTERMSG_TYPE_PONG 1          <span class="comment">/* Pong消息类型 (Ping命令的回复) */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLUSTERMSG_TYPE_MEET 2          <span class="comment">/* Meet消息类型，表示节点加入集群 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLUSTERMSG_TYPE_FAIL 3          <span class="comment">/* FAIL消息类型，表示节点下线*/</span></span></span><br></pre></td></tr></table></figure>
+<p>在Redis初始化服务initServer函数中，调用aeCreateTimeEvent注册了时间事件，周期性的执行serverCron函数，在serverCron中可以看到每隔100ms调用一次clusterCron函数，执行Redis Cluster定时任务：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">initServer</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    <span class="keyword">if</span> (aeCreateTimeEvent(server.el, <span class="number">1</span>, serverCron, <span class="literal">NULL</span>, <span class="literal">NULL</span>) == AE_ERR) &#123;</span><br><span class="line">        serverPanic(<span class="string">"Can't create event loop timers."</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">serverCron</span><span class="params">(struct aeEventLoop *eventLoop, <span class="keyword">long</span> <span class="keyword">long</span> id, <span class="keyword">void</span> *clientData)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* Redis Cluster 定时任务，每隔100ms调用一次 */</span></span><br><span class="line">    run_with_period(<span class="number">100</span>) &#123;</span><br><span class="line">        <span class="keyword">if</span> (server.cluster_enabled) clusterCron();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterCron</strong></p>
+<p><strong>clusterCron是集群相关的定时执行函数</strong>，每100ms执行一次：</p>
+<ol>
+<li>遍历集群中的所有节点，校验是否有连接中断的节点并进行重新连接<ul>
+<li>如果节点是自身或者是没有地址的节点，跳过</li>
+<li>如果节点处于握手状态并且已经超时，跳过</li>
+<li>如果连接为空，调用connConnect进行连接，回调函数为<strong>clusterLinkConnectHandler</strong></li>
+</ul>
+</li>
+<li>每执行10次clusterCron函数时随机选取五个节点，然后从这五个节点选出最早收到PONG回复的那个节点，也就是<strong>找出最久没有进行通信的那个节点，向其发送PING消息</strong>，clusterCron每100ms执行一次，执行10次是1000ms，也就是说<strong>每1秒选取一个节点调用clusterSendPing函数发送一次PING消息</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterCron</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* 校验是否有连接中断的节点并进行重新连接 */</span></span><br><span class="line">    di = dictGetSafeIterator(server.cluster-&gt;nodes);</span><br><span class="line">    server.cluster-&gt;stats_pfail_nodes = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 遍历集群中的所有节点</span></span><br><span class="line">    <span class="keyword">while</span>((de = dictNext(di)) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="comment">// 获取集群节点</span></span><br><span class="line">        clusterNode *node = dictGetVal(de);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果节点是自身或者是没有地址的节点，跳过 */</span></span><br><span class="line">        <span class="keyword">if</span> (node-&gt;flags &amp; (CLUSTER_NODE_MYSELF|CLUSTER_NODE_NOADDR)) <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (node-&gt;flags &amp; CLUSTER_NODE_PFAIL)</span><br><span class="line">            server.cluster-&gt;stats_pfail_nodes++;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果节点处于握手状态并且已经超时 */</span></span><br><span class="line">        <span class="keyword">if</span> (nodeInHandshake(node) &amp;&amp; now - node-&gt;ctime &gt; handshake_timeout) &#123;</span><br><span class="line">            clusterDelNode(node);</span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (node-&gt;link == <span class="literal">NULL</span>) &#123;</span><br><span class="line">            <span class="comment">// 创建clusterLink</span></span><br><span class="line">            clusterLink *link = createClusterLink(node);</span><br><span class="line">            link-&gt;conn = server.tls_cluster ? connCreateTLS() : connCreateSocket();</span><br><span class="line">            connSetPrivateData(link-&gt;conn, link);</span><br><span class="line">            <span class="comment">// 建立连接，监听函数为clusterLinkConnectHandler</span></span><br><span class="line">            <span class="keyword">if</span> (connConnect(link-&gt;conn, node-&gt;ip, node-&gt;cport, NET_FIRST_BIND_ADDR,</span><br><span class="line">                        clusterLinkConnectHandler) == <span class="number">-1</span>) &#123;</span><br><span class="line">                <span class="keyword">if</span> (node-&gt;ping_sent == <span class="number">0</span>) node-&gt;ping_sent = mstime();</span><br><span class="line">                serverLog(LL_DEBUG, <span class="string">"Unable to connect to "</span></span><br><span class="line">                    <span class="string">"Cluster Node [%s]:%d -&gt; %s"</span>, node-&gt;ip,</span><br><span class="line">                    node-&gt;cport, server.neterr);</span><br><span class="line"></span><br><span class="line">                freeClusterLink(link);</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 设置link</span></span><br><span class="line">            node-&gt;link = link;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    dictReleaseIterator(di);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* 每执行10次clusterCron函数，发送一次PING消息 */</span></span><br><span class="line">    <span class="keyword">if</span> (!(iteration % <span class="number">10</span>)) &#123;</span><br><span class="line">        <span class="keyword">int</span> j;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 随机选取节点并找到最早收到pong消息的节点 */</span></span><br><span class="line">        <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; <span class="number">5</span>; j++) &#123;</span><br><span class="line">            <span class="comment">// 随机选取节点</span></span><br><span class="line">            de = dictGetRandomKey(server.cluster-&gt;nodes);</span><br><span class="line">            <span class="comment">// 获取节点</span></span><br><span class="line">            clusterNode *<span class="keyword">this</span> = dictGetVal(de);</span><br><span class="line"></span><br><span class="line">            <span class="comment">/* 如果节点的连接已中断或者本次PING命令处于活跃状态 */</span></span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">this</span>-&gt;link == <span class="literal">NULL</span> || <span class="keyword">this</span>-&gt;ping_sent != <span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">            <span class="keyword">if</span> (<span class="keyword">this</span>-&gt;flags &amp; (CLUSTER_NODE_MYSELF|CLUSTER_NODE_HANDSHAKE))</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            <span class="comment">// 查找最早收到PONG消息的那个节点</span></span><br><span class="line">            <span class="keyword">if</span> (min_pong_node == <span class="literal">NULL</span> || min_pong &gt; <span class="keyword">this</span>-&gt;pong_received) &#123;</span><br><span class="line">                min_pong_node = <span class="keyword">this</span>;</span><br><span class="line">                min_pong = <span class="keyword">this</span>-&gt;pong_received;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 如果是最早收到PONG消息的节点</span></span><br><span class="line">        <span class="keyword">if</span> (min_pong_node) &#123;</span><br><span class="line">            serverLog(LL_DEBUG,<span class="string">"Pinging node %.40s"</span>, min_pong_node-&gt;name);</span><br><span class="line">            <span class="comment">// 发送PING消息</span></span><br><span class="line">            clusterSendPing(min_pong_node-&gt;link, CLUSTERMSG_TYPE_PING);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterNode</strong></p>
+<p>clusterNode是集群中节点对应的结构体，包含了以下内容：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">clusterNode</span> &#123;</span></span><br><span class="line">    <span class="keyword">mstime_t</span> ctime; <span class="comment">/* 节点对象创建时间 */</span></span><br><span class="line">    <span class="keyword">char</span> name[CLUSTER_NAMELEN]; <span class="comment">/* 节点名称 */</span></span><br><span class="line">    <span class="keyword">int</span> flags;      <span class="comment">/* 节点标识 */</span></span><br><span class="line">    <span class="keyword">uint64_t</span> configEpoch; <span class="comment">/* configEpoch */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> slots[CLUSTER_SLOTS/<span class="number">8</span>]; <span class="comment">/* 节点负责的slots */</span></span><br><span class="line">    sds slots_info; <span class="comment">/* Slots信息 */</span></span><br><span class="line">    <span class="keyword">int</span> numslots;   <span class="comment">/* 节点负责的slots数量 */</span></span><br><span class="line">    <span class="keyword">int</span> numslaves;  <span class="comment">/* 从节点的数量 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">clusterNode</span> **<span class="title">slaves</span>;</span> <span class="comment">/* 指向从节点的指针 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">clusterNode</span> *<span class="title">slaveof</span>;</span> <span class="comment">/* 指向主节点的指针 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> ping_sent;      <span class="comment">/* 最近一次发送PING消息的时间 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> pong_received;  <span class="comment">/* 收到pong消息的时间 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> data_received;  <span class="comment">/* Unix time we received any data */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> fail_time;      <span class="comment">/* 标记FAIL状态的时间 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> voted_time;     <span class="comment">/* 最近一次投票的时间 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> repl_offset_time;  <span class="comment">/* 收到主从复制offset的时间*/</span></span><br><span class="line">    <span class="keyword">mstime_t</span> orphaned_time;     <span class="comment">/* Starting time of orphaned master condition */</span></span><br><span class="line">    <span class="keyword">long</span> <span class="keyword">long</span> repl_offset;      <span class="comment">/* 节点主从复制offset */</span></span><br><span class="line">    <span class="keyword">char</span> ip[NET_IP_STR_LEN];  <span class="comment">/* IP */</span></span><br><span class="line">    <span class="keyword">int</span> port;                   <span class="comment">/* 客户端通信端口 */</span></span><br><span class="line">    <span class="keyword">int</span> pport;                  <span class="comment">/* 使用TLS协议的端口 */</span></span><br><span class="line">    <span class="keyword">int</span> cport;                  <span class="comment">/* 集群通信端口 */</span></span><br><span class="line">    clusterLink *link;          <span class="comment">/* TCP/IP连接相关信息 */</span></span><br><span class="line">    <span class="built_in">list</span> *fail_reports;         <span class="comment">/* List of nodes signaling this as failing */</span></span><br><span class="line">&#125; clusterNode;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterLinkConnectHandler</strong></p>
+<p>clusterLinkConnectHandler是建立连接的监听函数，当连接建立时会调用clusterLinkConnectHandler进行处理，在clusterLinkConnectHandler函数中可以看到，又调用了connSetReadHandler注册了可读事件的监听，对应的回调函数为clusterReadHandler，当<strong>收到其他节点发送的通信消息时会调用clusterReadHandler函数处理</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterLinkConnectHandler</span><span class="params">(connection *conn)</span> </span>&#123;</span><br><span class="line">    clusterLink *link = connGetPrivateData(conn);</span><br><span class="line">    clusterNode *node = link-&gt;node;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 校验连接是否成功 */</span></span><br><span class="line">    <span class="keyword">if</span> (connGetState(conn) != CONN_STATE_CONNECTED) &#123;</span><br><span class="line">        serverLog(LL_VERBOSE, <span class="string">"Connection with Node %.40s at %s:%d failed: %s"</span>,</span><br><span class="line">                node-&gt;name, node-&gt;ip, node-&gt;cport,</span><br><span class="line">                connGetLastError(conn));</span><br><span class="line">        freeClusterLink(link);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 注册readHandler，监听函数为clusterReadHandler */</span></span><br><span class="line">    connSetReadHandler(conn, clusterReadHandler);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 省略..</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="集群间通信"><a href="#集群间通信" class="headerlink" title="集群间通信"></a>集群间通信</h2><h3 id="通信消息结构体定义"><a href="#通信消息结构体定义" class="headerlink" title="通信消息结构体定义"></a>通信消息结构体定义</h3><p><strong>clusterMsg</strong></p>
+<p>集群间通信的消息对应的结构体为clusterMsg，里面包含了消息类型、发送消息节点的slots信息以及<strong>节点间通信的消息体clusterMsgData</strong>等信息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> sig[<span class="number">4</span>];        <span class="comment">/*  "RCmb"签名 */</span></span><br><span class="line">    <span class="keyword">uint32_t</span> totlen;    <span class="comment">/* 消息总长度 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> ver;       <span class="comment">/* 协议版本, 当前设置为1 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> port;      <span class="comment">/* 端口 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> type;      <span class="comment">/* 消息类型 */</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">  </span><br><span class="line">    <span class="keyword">char</span> sender[CLUSTER_NAMELEN]; <span class="comment">/* 发送消息节点的名称 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> myslots[CLUSTER_SLOTS/<span class="number">8</span>]; <span class="comment">/* 发送消息节点的slots信息 */</span></span><br><span class="line">    <span class="keyword">char</span> slaveof[CLUSTER_NAMELEN];</span><br><span class="line">    <span class="keyword">char</span> myip[NET_IP_STR_LEN];    <span class="comment">/* 发送消息节点的ip */</span></span><br><span class="line">    <span class="keyword">char</span> notused1[<span class="number">32</span>];  <span class="comment">/* 32字节的保留数据 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> pport;      <span class="comment">/* 使用TLS协议时的端口 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> cport;      <span class="comment">/* 发送消息节点的集群总线端口，也就是用于集群间通信的端口 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> flags;      <span class="comment">/* 发送消息节点的flags标识 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> state; <span class="comment">/* 发送消息节点的集群状态 */</span></span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> mflags[<span class="number">3</span>]; <span class="comment">/* Message flags: CLUSTERMSG_FLAG[012]_... */</span></span><br><span class="line">    <span class="keyword">union</span> clusterMsgData data; <span class="comment">// 集群通信的实际消息</span></span><br><span class="line">&#125; clusterMsg;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterMsgData</strong></p>
+<p>clusterMsgData里面<strong>存储了节点间进行通信的实际消息，不同消息类型对应不同的数据结构</strong>：</p>
+<ol>
+<li><strong>clusterMsgDataGossip</strong>：PING, MEET 和 PONG消息对应的数据结构</li>
+<li>clusterMsgDataFail：FAIL消息对应的数据结构</li>
+<li>clusterMsgDataPublish：PUBLISH消息对应的数据结构</li>
+<li>clusterMsgDataUpdate：UPDATE消息对应的数据结构</li>
+<li>clusterMsgModule：MODULE消息对应的数据结构</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">union</span> clusterMsgData &#123;</span><br><span class="line">    <span class="comment">/* PING, MEET and PONG消息对应的数据结构 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">        clusterMsgDataGossip gossip[<span class="number">1</span>];</span><br><span class="line">    &#125; ping;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* FAIL消息对应的数据结构 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">        clusterMsgDataFail about;</span><br><span class="line">    &#125; fail;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* PUBLISH消息对应的数据结构 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">        clusterMsgDataPublish msg;</span><br><span class="line">    &#125; publish;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* UPDATE消息对应的数据结构 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">        clusterMsgDataUpdate nodecfg;</span><br><span class="line">    &#125; update;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* MODULE消息对应的数据结构 */</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">        clusterMsgModule msg;</span><br><span class="line">    &#125; <span class="keyword">module</span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterMsgDataGossip</strong></p>
+<p>clusterMsgDataGossip是集群间发送PING、MEET 和 PONG消息对应的数据结构，里面包含以下信息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> nodename[CLUSTER_NAMELEN]; <span class="comment">/* 节点名称 */</span></span><br><span class="line">    <span class="keyword">uint32_t</span> ping_sent; <span class="comment">/* 发送PING命令的时间 */</span></span><br><span class="line">    <span class="keyword">uint32_t</span> pong_received; <span class="comment">/* 收到PONG命令的时间 */</span></span><br><span class="line">    <span class="keyword">char</span> ip[NET_IP_STR_LEN];  <span class="comment">/* 节点的IP */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> port;              <span class="comment">/* 用于客户端通信的端口 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> cport;             <span class="comment">/* 集群间通信的端口 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> flags;             <span class="comment">/* 节点的flags标识 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> pport;             <span class="comment">/* 使用TLS协议时的端口 */</span></span><br><span class="line">    <span class="keyword">uint16_t</span> notused1;</span><br><span class="line">&#125; clusterMsgDataGossip;</span><br></pre></td></tr></table></figure>
+<h3 id="PING消息的发送"><a href="#PING消息的发送" class="headerlink" title="PING消息的发送"></a>PING消息的发送</h3><p><strong>clusterSendPing</strong></p>
+<p>clusterSendPing函数用于向指定节点发送PING消息，<strong>Ping消息中不仅包含当前节点的信息，也会随机选取一些其他的节点，将其他节点的信息封装在消息体中进行发送</strong>，随机选取节点的个数计算规则如下：</p>
+<ul>
+<li><code>wanted</code>：<strong>随机选取的节点个数</strong>，默认是集群中节点的数量除以10</li>
+<li><code>freshnodes</code>：随机选取的节点个数的最大值，默认集群中节点的数量减2</li>
+</ul>
+<p>如果<code>wanted</code>小于3，那么将<code>wanted</code>置为3，也就是最少选取3个节点；</p>
+<p>如果<code>wanted</code>大于<code>freshnodes</code>，将<code>wanted</code>置为<code>freshnodes</code>的值，也就是最大可以选取<code>freshnodes</code>个节点；</p>
+<p>选取的节点个数<code>wanted</code>确定之后，处理逻辑如下：</p>
+<ol>
+<li><p><strong>调用clusterBuildMessageHdr函数构建消息头</strong></p>
+</li>
+<li><p>根据<code>wanted</code>的数量随机选取节点，处于以下几种情况的节点将被跳过</p>
+<ul>
+<li>FAIL下线状态的节点</li>
+<li><p>处于握手状态的节点</p>
+</li>
+<li><p>没有地址信息的节点</p>
+</li>
+<li>失去连接的节点并且没有配置slots.</li>
+</ul>
+</li>
+<li><p><strong>调用clusterSetGossipEntry函数将选取的节点信息加入到消息体中</strong></p>
+</li>
+<li><p><strong>调用clusterSendMessage函数发送消息</strong></p>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterSendPing</span><span class="params">(clusterLink *link, <span class="keyword">int</span> type)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> *buf; <span class="comment">/* 发送的消息数据*/</span></span><br><span class="line">    clusterMsg *hdr; <span class="comment">/* 节点间通信消息 */</span></span><br><span class="line">    <span class="keyword">int</span> gossipcount = <span class="number">0</span>; </span><br><span class="line">    <span class="keyword">int</span> wanted; <span class="comment">/* 选取的节点个数 */</span></span><br><span class="line">    <span class="keyword">int</span> totlen; <span class="comment">/* 总长度 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 集群中节点的数量 - 2</span></span><br><span class="line">    <span class="keyword">int</span> freshnodes = dictSize(server.cluster-&gt;nodes)<span class="number">-2</span>;</span><br><span class="line">    <span class="comment">// 集群中节点的数量除以10</span></span><br><span class="line">    wanted = <span class="built_in">floor</span>(dictSize(server.cluster-&gt;nodes)/<span class="number">10</span>);</span><br><span class="line">    <span class="comment">// 如果wanted小于3，则设置为3</span></span><br><span class="line">    <span class="keyword">if</span> (wanted &lt; <span class="number">3</span>) wanted = <span class="number">3</span>;</span><br><span class="line">    <span class="comment">// 如果大于最大节点数，设置为freshnodes</span></span><br><span class="line">    <span class="keyword">if</span> (wanted &gt; freshnodes) wanted = freshnodes;</span><br><span class="line">  </span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">  </span><br><span class="line">    <span class="keyword">if</span> (totlen &lt; (<span class="keyword">int</span>)<span class="keyword">sizeof</span>(clusterMsg)) totlen = <span class="keyword">sizeof</span>(clusterMsg);</span><br><span class="line">    buf = zcalloc(totlen); <span class="comment">// 分配空间</span></span><br><span class="line">    hdr = (clusterMsg*) buf;</span><br><span class="line">    <span class="keyword">if</span> (link-&gt;node &amp;&amp; type == CLUSTERMSG_TYPE_PING)</span><br><span class="line">        link-&gt;node-&gt;ping_sent = mstime();<span class="comment">// 更新发送PING消息时间</span></span><br><span class="line">    <span class="comment">// 构建消息头</span></span><br><span class="line">    clusterBuildMessageHdr(hdr,type);</span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* 计算 gossip  */</span></span><br><span class="line">    <span class="keyword">int</span> maxiterations = wanted*<span class="number">3</span>;</span><br><span class="line">    <span class="keyword">while</span>(freshnodes &gt; <span class="number">0</span> &amp;&amp; gossipcount &lt; wanted &amp;&amp; maxiterations--) &#123;</span><br><span class="line">        <span class="comment">// 随机选取节点</span></span><br><span class="line">        dictEntry *de = dictGetRandomKey(server.cluster-&gt;nodes);</span><br><span class="line">        clusterNode *<span class="keyword">this</span> = dictGetVal(de);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果是自身 */</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span> == myself) <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果是FAIL状态，跳过 */</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>-&gt;flags &amp; CLUSTER_NODE_PFAIL) <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 以下节点跳过:</span></span><br><span class="line"><span class="comment">         * 1) 处于握手状态的节点.</span></span><br><span class="line"><span class="comment">         * 3) 没有地址信息的节点.</span></span><br><span class="line"><span class="comment">         * 4) 失去连接的节点并且没有配置slots.</span></span><br><span class="line"><span class="comment">         */</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="keyword">this</span>-&gt;flags &amp; (CLUSTER_NODE_HANDSHAKE|CLUSTER_NODE_NOADDR) ||</span><br><span class="line">            (<span class="keyword">this</span>-&gt;link == <span class="literal">NULL</span> &amp;&amp; <span class="keyword">this</span>-&gt;numslots == <span class="number">0</span>))</span><br><span class="line">        &#123;</span><br><span class="line">            freshnodes--; <span class="comment">/* Technically not correct, but saves CPU. */</span></span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果节点已经添加 */</span></span><br><span class="line">        <span class="keyword">if</span> (clusterNodeIsInGossipSection(hdr,gossipcount,<span class="keyword">this</span>)) <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 添加到消息体中 */</span></span><br><span class="line">        clusterSetGossipEntry(hdr,gossipcount,<span class="keyword">this</span>);</span><br><span class="line">        freshnodes--;</span><br><span class="line">        gossipcount++;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    </span><br><span class="line">    totlen = <span class="keyword">sizeof</span>(clusterMsg)-<span class="keyword">sizeof</span>(<span class="keyword">union</span> clusterMsgData);</span><br><span class="line">    totlen += (<span class="keyword">sizeof</span>(clusterMsgDataGossip)*gossipcount);</span><br><span class="line">    hdr-&gt;count = htons(gossipcount);</span><br><span class="line">    hdr-&gt;totlen = htonl(totlen);</span><br><span class="line">    <span class="comment">// 发送消息</span></span><br><span class="line">    clusterSendMessage(link,buf,totlen);</span><br><span class="line">    zfree(buf);</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="构建消息头"><a href="#构建消息头" class="headerlink" title="构建消息头"></a>构建消息头</h4><p><strong>clusterBuildMessageHdr</strong></p>
+<p>clusterBuildMessageHdr函数用于构建消息头，设置了消息发送者的节点相关信息：</p>
+<ol>
+<li>设置了签名、消息类型、节点IP、端口等信息</li>
+<li><strong>设置发送消息节点的slots信息，如果发送消息的节点是从节点，需要使用它对应的主节点的slots信息</strong></li>
+<li>计算集群消息的总长度totlen，并设置到消息头中</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterBuildMessageHdr</span><span class="params">(clusterMsg *hdr, <span class="keyword">int</span> type)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> totlen = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">uint64_t</span> offset;</span><br><span class="line">    clusterNode *master;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果是从节点, 使用它对应的主节点的信息 */</span></span><br><span class="line">    master = (nodeIsSlave(myself) &amp;&amp; myself-&gt;slaveof) ?</span><br><span class="line">              myself-&gt;slaveof : myself;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">memset</span>(hdr,<span class="number">0</span>,<span class="keyword">sizeof</span>(*hdr));</span><br><span class="line">    hdr-&gt;ver = htons(CLUSTER_PROTO_VER);</span><br><span class="line">    <span class="comment">// 设置签名</span></span><br><span class="line">    hdr-&gt;sig[<span class="number">0</span>] = <span class="string">'R'</span>;</span><br><span class="line">    hdr-&gt;sig[<span class="number">1</span>] = <span class="string">'C'</span>;</span><br><span class="line">    hdr-&gt;sig[<span class="number">2</span>] = <span class="string">'m'</span>;</span><br><span class="line">    hdr-&gt;sig[<span class="number">3</span>] = <span class="string">'b'</span>;</span><br><span class="line">    <span class="comment">// 设置消息类型</span></span><br><span class="line">    hdr-&gt;type = htons(type);</span><br><span class="line">    <span class="built_in">memcpy</span>(hdr-&gt;sender,myself-&gt;name,CLUSTER_NAMELEN);</span><br><span class="line">    <span class="built_in">memset</span>(hdr-&gt;myip,<span class="number">0</span>,NET_IP_STR_LEN);</span><br><span class="line">    <span class="keyword">if</span> (server.cluster_announce_ip) &#123;</span><br><span class="line">        <span class="comment">// 设置ip</span></span><br><span class="line">        <span class="built_in">strncpy</span>(hdr-&gt;myip,server.cluster_announce_ip,NET_IP_STR_LEN);</span><br><span class="line">        hdr-&gt;myip[NET_IP_STR_LEN<span class="number">-1</span>] = <span class="string">'\0'</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 处理端口 */</span></span><br><span class="line">    <span class="keyword">int</span> announced_port, announced_pport, announced_cport;</span><br><span class="line">    deriveAnnouncedPorts(&amp;announced_port, &amp;announced_pport, &amp;announced_cport);</span><br><span class="line">    <span class="comment">// 设置当前节点的slots信息</span></span><br><span class="line">    <span class="built_in">memcpy</span>(hdr-&gt;myslots,master-&gt;slots,<span class="keyword">sizeof</span>(hdr-&gt;myslots));</span><br><span class="line">    <span class="built_in">memset</span>(hdr-&gt;slaveof,<span class="number">0</span>,CLUSTER_NAMELEN);</span><br><span class="line">    <span class="keyword">if</span> (myself-&gt;slaveof != <span class="literal">NULL</span>)</span><br><span class="line">        <span class="built_in">memcpy</span>(hdr-&gt;slaveof,myself-&gt;slaveof-&gt;name, CLUSTER_NAMELEN);</span><br><span class="line">    <span class="comment">// 设置端口</span></span><br><span class="line">    hdr-&gt;port = htons(announced_port);</span><br><span class="line">    hdr-&gt;pport = htons(announced_pport);</span><br><span class="line">    hdr-&gt;cport = htons(announced_cport);</span><br><span class="line">    <span class="comment">// 设置标识</span></span><br><span class="line">    hdr-&gt;flags = htons(myself-&gt;flags);</span><br><span class="line">    <span class="comment">// 设置集群状态</span></span><br><span class="line">    hdr-&gt;state = server.cluster-&gt;state;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 设置currentEpoch和configEpoch */</span></span><br><span class="line">    hdr-&gt;currentEpoch = htonu64(server.cluster-&gt;currentEpoch);</span><br><span class="line">    hdr-&gt;configEpoch = htonu64(master-&gt;configEpoch);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 设置主从复制的offset. */</span></span><br><span class="line">    <span class="keyword">if</span> (nodeIsSlave(myself))</span><br><span class="line">        offset = replicationGetSlaveOffset();</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        offset = server.master_repl_offset;</span><br><span class="line">    hdr-&gt;offset = htonu64(offset);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (nodeIsMaster(myself) &amp;&amp; server.cluster-&gt;mf_end)</span><br><span class="line">        hdr-&gt;mflags[<span class="number">0</span>] |= CLUSTERMSG_FLAG0_PAUSED;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 计算消息总长度 */</span></span><br><span class="line">    <span class="keyword">if</span> (type == CLUSTERMSG_TYPE_FAIL) &#123;</span><br><span class="line">        totlen = <span class="keyword">sizeof</span>(clusterMsg)-<span class="keyword">sizeof</span>(<span class="keyword">union</span> clusterMsgData);</span><br><span class="line">        totlen += <span class="keyword">sizeof</span>(clusterMsgDataFail);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (type == CLUSTERMSG_TYPE_UPDATE) &#123;</span><br><span class="line">        totlen = <span class="keyword">sizeof</span>(clusterMsg)-<span class="keyword">sizeof</span>(<span class="keyword">union</span> clusterMsgData);</span><br><span class="line">        totlen += <span class="keyword">sizeof</span>(clusterMsgDataUpdate);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 设置消息总长度</span></span><br><span class="line">    hdr-&gt;totlen = htonl(totlen);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="构建消息体"><a href="#构建消息体" class="headerlink" title="构建消息体"></a>构建消息体</h4><p><strong>clusterSetGossipEntry</strong></p>
+<p>clusterSetGossipEntry函数用于构建消息体，将随机选取的其他节点信息加入到ping消息对应的数组hdr-&gt;data.ping.gossip[i]中，并设置节点的相关信息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterSetGossipEntry</span><span class="params">(clusterMsg *hdr, <span class="keyword">int</span> i, clusterNode *n)</span> </span>&#123;</span><br><span class="line">    clusterMsgDataGossip *gossip;</span><br><span class="line">    gossip = &amp;(hdr-&gt;data.ping.gossip[i]);</span><br><span class="line">    <span class="built_in">memcpy</span>(gossip-&gt;nodename,n-&gt;name,CLUSTER_NAMELEN);</span><br><span class="line">    <span class="comment">// 设置PING消息发送时间</span></span><br><span class="line">    gossip-&gt;ping_sent = htonl(n-&gt;ping_sent/<span class="number">1000</span>);</span><br><span class="line">    <span class="comment">// 设置收到PONG消息时间</span></span><br><span class="line">    gossip-&gt;pong_received = htonl(n-&gt;pong_received/<span class="number">1000</span>);</span><br><span class="line">    <span class="comment">// 设置IP</span></span><br><span class="line">    <span class="built_in">memcpy</span>(gossip-&gt;ip,n-&gt;ip,<span class="keyword">sizeof</span>(n-&gt;ip));</span><br><span class="line">    <span class="comment">// 设置端口</span></span><br><span class="line">    gossip-&gt;port = htons(n-&gt;port);</span><br><span class="line">    <span class="comment">// 设置集群端口</span></span><br><span class="line">    gossip-&gt;cport = htons(n-&gt;cport);</span><br><span class="line">    <span class="comment">// 设置标识</span></span><br><span class="line">    gossip-&gt;flags = htons(n-&gt;flags);</span><br><span class="line">    gossip-&gt;pport = htons(n-&gt;pport);</span><br><span class="line">    gossip-&gt;notused1 = <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="PING消息的处理"><a href="#PING消息的处理" class="headerlink" title="PING消息的处理"></a>PING消息的处理</h3><p><strong>clusterReadHandler</strong></p>
+<p>由上面的clusterLinkConnectHandler函数可知，<strong>收到其他节点发送的通信消息时会调用clusterReadHandler函数处理</strong>，在clusterReadHandler函数中会开启while循环，不断读取数据，直到获取完整的数据（收到的数据长度rcvbuflen等于消息中设置数据总长度时），调用clusterProcessPacket函数处理收到的消息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterReadHandler</span><span class="params">(connection *conn)</span> </span>&#123;</span><br><span class="line">    clusterMsg buf[<span class="number">1</span>];</span><br><span class="line">    <span class="keyword">ssize_t</span> nread;</span><br><span class="line">    clusterMsg *hdr;</span><br><span class="line">    clusterLink *link = connGetPrivateData(conn);</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> readlen, rcvbuflen;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span>(<span class="number">1</span>) &#123; </span><br><span class="line">        rcvbuflen = link-&gt;rcvbuf_len;</span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 省略...</span></span><br><span class="line">      </span><br><span class="line">        <span class="comment">// 读取数据</span></span><br><span class="line">        nread = connRead(conn,buf,readlen);</span><br><span class="line">        <span class="comment">// 如果数据读取完毕</span></span><br><span class="line">        <span class="keyword">if</span> (nread == <span class="number">-1</span> &amp;&amp; (connGetState(conn) == CONN_STATE_CONNECTED)) <span class="keyword">return</span>; </span><br><span class="line">        </span><br><span class="line">        <span class="comment">// 省略...</span></span><br><span class="line">        </span><br><span class="line">        <span class="comment">/* 如果已经获取完整数据（rcvbuflen等于消息中设置数据总长度），处理数据包 */</span></span><br><span class="line">        <span class="keyword">if</span> (rcvbuflen &gt;= <span class="number">8</span> &amp;&amp; rcvbuflen == ntohl(hdr-&gt;totlen)) &#123;</span><br><span class="line">            <span class="comment">// 处理消息</span></span><br><span class="line">            <span class="keyword">if</span> (clusterProcessPacket(link)) &#123; </span><br><span class="line">                <span class="keyword">if</span> (link-&gt;rcvbuf_alloc &gt; RCVBUF_INIT_LEN) &#123;</span><br><span class="line">                    zfree(link-&gt;rcvbuf);</span><br><span class="line">                    link-&gt;rcvbuf = zmalloc(link-&gt;rcvbuf_alloc = RCVBUF_INIT_LEN);</span><br><span class="line">                &#125;</span><br><span class="line">                link-&gt;rcvbuf_len = <span class="number">0</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="keyword">return</span>; </span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterProcessPacket</strong></p>
+<p>clusterProcessPacket函数用于处理收到的通信消息，可以看到有许多if else分支，根据消息类型的不同，进行了不同的处理，这里先只关注PING消息的处理：</p>
+<ol>
+<li>如果消息类型是PING或者MEET，<strong>调用clusterSendPing函数发送PONG消息，传入的消息类型为CLUSTERMSG_TYPE_PONG，说明PING和PONG消息都是通过clusterSendPing函数实现的，PING和PONG消息的数据结构一致，那么回复的PONG消息中也会带上回复者的节点信息以及回复者随机选取的其他节点信息，以此达到节点间交换信息的目的</strong></li>
+<li>如果是PING, PONG或者MEET消息，并且sender不为空，不为空表示发送消息的节点是当前节点已知的，<strong>调用clusterProcessGossipSection函数处理消息体中的Gossip数据</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">clusterProcessPacket</span><span class="params">(clusterLink *link)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 获取发送的消息</span></span><br><span class="line">    clusterMsg *hdr = (clusterMsg*) link-&gt;rcvbuf;</span><br><span class="line">    <span class="comment">// 消息长度</span></span><br><span class="line">    <span class="keyword">uint32_t</span> totlen = ntohl(hdr-&gt;totlen);</span><br><span class="line">    <span class="comment">// 消息类型</span></span><br><span class="line">    <span class="keyword">uint16_t</span> type = ntohs(hdr-&gt;type);</span><br><span class="line">    <span class="keyword">mstime_t</span> now = mstime();</span><br><span class="line">    <span class="keyword">uint16_t</span> flags = ntohs(hdr-&gt;flags);</span><br><span class="line">    <span class="keyword">uint64_t</span> senderCurrentEpoch = <span class="number">0</span>, senderConfigEpoch = <span class="number">0</span>;</span><br><span class="line">    clusterNode *sender;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">  </span><br><span class="line">    <span class="comment">/* 校验发送者是否是已知的节点 */</span></span><br><span class="line">    sender = clusterLookupNode(hdr-&gt;sender);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 更是发送者收到数据的时间*/</span></span><br><span class="line">    <span class="keyword">if</span> (sender) sender-&gt;data_received = now;</span><br><span class="line">   </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">   </span><br><span class="line">    <span class="comment">/* 如果是PING消息或者MEET消息 */</span></span><br><span class="line">    <span class="keyword">if</span> (type == CLUSTERMSG_TYPE_PING || type == CLUSTERMSG_TYPE_MEET) &#123;</span><br><span class="line">        serverLog(LL_DEBUG,<span class="string">"Ping packet received: %p"</span>, (<span class="keyword">void</span>*)link-&gt;node);</span><br><span class="line">      </span><br><span class="line">        <span class="keyword">if</span> (!sender &amp;&amp; type == CLUSTERMSG_TYPE_MEET)</span><br><span class="line">            clusterProcessGossipSection(hdr,link);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 发送PONG消息，这里传入的类型是CLUSTERMSG_TYPE_PONG */</span></span><br><span class="line">        clusterSendPing(link,CLUSTERMSG_TYPE_PONG);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* PING, PONG, MEET 消息 */</span></span><br><span class="line">    <span class="keyword">if</span> (type == CLUSTERMSG_TYPE_PING || type == CLUSTERMSG_TYPE_PONG ||</span><br><span class="line">        type == CLUSTERMSG_TYPE_MEET)</span><br><span class="line">    &#123;</span><br><span class="line">      </span><br><span class="line">        <span class="comment">// 省略...</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 处理消息体中的Gossip节点数据 */</span></span><br><span class="line">        <span class="keyword">if</span> (sender) clusterProcessGossipSection(hdr,link);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        serverLog(LL_WARNING,<span class="string">"Received unknown packet type: %d"</span>, type);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterProcessGossipSection</strong></p>
+<p>clusterProcessGossipSection函数用于处理clusterMsg中的Gossip节点信息g，它从集群消息中获取Gossip节点数据，根据节点数量进行遍历：</p>
+<ol>
+<li><p>调用clusterLookupNode函数根据nodename从当前收到消息的节点的集群中查找Gossip节点，查找结果记为<code>node</code></p>
+<ul>
+<li>如果<code>node</code>如果不为空，说明可以从当前节点的集群中找到，Gossip节点针对当前节点是已知的，<strong>需要注意node指向的是当前收到消息节点中维护的相同nodename的节点，g指向当前正在遍历的gossip节点（sender发送的消息中携带gossip数组），注意两者的区别</strong></li>
+<li>如果<code>node</code>如果为空，说明Gossip节点针对当前节点是未知的，之前不在当前节点维护的集群节点中</li>
+</ul>
+</li>
+<li><p>如果<code>node</code>不为空，也就是当前收到消息这个节点的集群中已经存在<code>node</code>节点，进行如下处理：</p>
+<p>（1）发送消息的节点<code>sender</code>是主节点时有以下两种情况：</p>
+<ul>
+<li>如果<code>node</code>是FAIL或者PFAIL状态，需要将<code>sender</code>加入到<code>node</code>节点的下线链表fail_reports中，表示sender认为node节点下线（clusterNodeAddFailureReport函数）</li>
+<li>断是否有必要将<code>node</code>标记为下线状态（markNodeAsFailingIfNeeded函数）</li>
+<li>如果<code>node</code>不是FAIL或者PFAIL状态，需要校验<code>node</code>是否已经在<code>sender</code>的下线节点链表fail_reports中，如果在需要从中移除</li>
+</ul>
+<p>（2）如果<code>node</code>节点不是FAIL、PFAIL、NOADDR状态，并且<code>node</code>的ip或者端口与<code>g</code>指向的gossip节点中的ip或者端口不一致，需要更新node中的ip和端口</p>
+</li>
+<li><p>如果<code>node</code>为空，说明之前不在当前节点维护的集群节点中，如果gossip节点不处于NOADDR状态并且不在nodes_black_list中，新建节点，加入到当前收到消息的节点维护的集群数据server.cluster中</p>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterProcessGossipSection</span><span class="params">(clusterMsg *hdr, clusterLink *link)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">uint16_t</span> count = ntohs(hdr-&gt;count);</span><br><span class="line">    <span class="comment">// 获取clusterMsgDataGossip数据</span></span><br><span class="line">    clusterMsgDataGossip *g = (clusterMsgDataGossip*) hdr-&gt;data.ping.gossip;</span><br><span class="line">    <span class="comment">// 发送消息的节点</span></span><br><span class="line">    clusterNode *sender = link-&gt;node ? link-&gt;node : clusterLookupNode(hdr-&gt;sender);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span>(count--) &#123;</span><br><span class="line">        <span class="comment">// 获取节点标识</span></span><br><span class="line">        <span class="keyword">uint16_t</span> flags = ntohs(g-&gt;flags);</span><br><span class="line">        clusterNode *node;</span><br><span class="line">        sds ci;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (server.verbosity == LL_DEBUG) &#123;</span><br><span class="line">            ci = representClusterNodeFlags(sdsempty(), flags);</span><br><span class="line">            serverLog(LL_DEBUG,<span class="string">"GOSSIP %.40s %s:%d@%d %s"</span>,</span><br><span class="line">                g-&gt;nodename,</span><br><span class="line">                g-&gt;ip,</span><br><span class="line">                ntohs(g-&gt;port),</span><br><span class="line">                ntohs(g-&gt;cport),</span><br><span class="line">                ci);</span><br><span class="line">            sdsfree(ci);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 根据nodename查找节点，node指向当前收到消息节点中维护的节点*/</span></span><br><span class="line">        node = clusterLookupNode(g-&gt;nodename);</span><br><span class="line">        <span class="comment">// 如果节点已知</span></span><br><span class="line">        <span class="keyword">if</span> (node) &#123;</span><br><span class="line">            <span class="comment">/* 如果发送者是主节点 */</span></span><br><span class="line">            <span class="keyword">if</span> (sender &amp;&amp; nodeIsMaster(sender) &amp;&amp; node != myself) &#123;</span><br><span class="line">                <span class="comment">// 如果gossip节点是FAIL或者PFAIL状态</span></span><br><span class="line">                <span class="keyword">if</span> (flags &amp; (CLUSTER_NODE_FAIL|CLUSTER_NODE_PFAIL)) &#123;</span><br><span class="line">                    <span class="comment">// 将sender加入到node节点的下线链表fail_reports中，表示sender认为node节点下线</span></span><br><span class="line">                    <span class="keyword">if</span> (clusterNodeAddFailureReport(node,sender)) &#123;</span><br><span class="line">                        serverLog(LL_VERBOSE,</span><br><span class="line">                            <span class="string">"Node %.40s reported node %.40s as not reachable."</span>,</span><br><span class="line">                            sender-&gt;name, node-&gt;name);</span><br><span class="line">                    &#125;</span><br><span class="line">                    <span class="comment">// 判断是否有必要将节点置为客观下线</span></span><br><span class="line">                    markNodeAsFailingIfNeeded(node);</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    <span class="comment">// 校验节点是否在下线节点链表fail_reports中，如果在需要移除恢复在线状态</span></span><br><span class="line">                    <span class="keyword">if</span> (clusterNodeDelFailureReport(node,sender)) &#123;</span><br><span class="line">                        serverLog(LL_VERBOSE,</span><br><span class="line">                            <span class="string">"Node %.40s reported node %.40s is back online."</span>,</span><br><span class="line">                            sender-&gt;name, node-&gt;name);</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">/* 如果节点不是FAIL或者PFAIL状态，并且node中记录的ping发送时间为0，并且node不在fail_reports中*/</span></span><br><span class="line">            <span class="keyword">if</span> (!(flags &amp; (CLUSTER_NODE_FAIL|CLUSTER_NODE_PFAIL)) &amp;&amp;</span><br><span class="line">                node-&gt;ping_sent == <span class="number">0</span> &amp;&amp;</span><br><span class="line">                clusterNodeFailureReportsCount(node) == <span class="number">0</span>)</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">mstime_t</span> pongtime = ntohl(g-&gt;pong_received);</span><br><span class="line">                pongtime *= <span class="number">1000</span>; <span class="comment">/* 转为毫秒 */</span></span><br><span class="line">                <span class="keyword">if</span> (pongtime &lt;= (server.mstime+<span class="number">500</span>) &amp;&amp;</span><br><span class="line">                    pongtime &gt; node-&gt;pong_received)</span><br><span class="line">                &#123;</span><br><span class="line">                    node-&gt;pong_received = pongtime; <span class="comment">// 更新收到pong消息时间</span></span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">/* 如果node节点不是FAIL、PFAIL、NOADDR状态，并且node的ip或者端口与g节点中的ip或者端口不一致，需要更新node中的ip和端口 */</span></span><br><span class="line">            <span class="comment">/* 需要注意node节点和g节点的区别，node节点是从当前收到消息节点中根据节点id查找到的节点，也就是接收者自己记录的节点信息 */</span></span><br><span class="line">            <span class="comment">/* g指向当前在遍历的那个gossip节点，也就是发送者带过来的节点信息 */</span></span><br><span class="line">            <span class="keyword">if</span> (node-&gt;flags &amp; (CLUSTER_NODE_FAIL|CLUSTER_NODE_PFAIL) &amp;&amp;</span><br><span class="line">                !(flags &amp; CLUSTER_NODE_NOADDR) &amp;&amp;</span><br><span class="line">                !(flags &amp; (CLUSTER_NODE_FAIL|CLUSTER_NODE_PFAIL)) &amp;&amp;</span><br><span class="line">                (strcasecmp(node-&gt;ip,g-&gt;ip) ||</span><br><span class="line">                 node-&gt;port != ntohs(g-&gt;port) ||</span><br><span class="line">                 node-&gt;cport != ntohs(g-&gt;cport)))</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="keyword">if</span> (node-&gt;link) freeClusterLink(node-&gt;link);</span><br><span class="line">                <span class="comment">// 更新node节点中的端口、ip信息</span></span><br><span class="line">                <span class="built_in">memcpy</span>(node-&gt;ip,g-&gt;ip,NET_IP_STR_LEN);</span><br><span class="line">                node-&gt;port = ntohs(g-&gt;port);</span><br><span class="line">                node-&gt;pport = ntohs(g-&gt;pport);</span><br><span class="line">                node-&gt;cport = ntohs(g-&gt;cport);</span><br><span class="line">                node-&gt;flags &amp;= ~CLUSTER_NODE_NOADDR;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123; <span class="comment">// 如果节点未知</span></span><br><span class="line">            <span class="comment">/* 如果节点不处于NOADDR状态并且不在nodes_black_list中 */</span></span><br><span class="line">            <span class="keyword">if</span> (sender &amp;&amp;</span><br><span class="line">                !(flags &amp; CLUSTER_NODE_NOADDR) &amp;&amp;</span><br><span class="line">                !clusterBlacklistExists(g-&gt;nodename))</span><br><span class="line">            &#123;</span><br><span class="line">                clusterNode *node;</span><br><span class="line">                <span class="comment">// 创建节点</span></span><br><span class="line">                node = createClusterNode(g-&gt;nodename, flags);</span><br><span class="line">                <span class="built_in">memcpy</span>(node-&gt;ip,g-&gt;ip,NET_IP_STR_LEN);</span><br><span class="line">                node-&gt;port = ntohs(g-&gt;port);</span><br><span class="line">                node-&gt;pport = ntohs(g-&gt;pport);</span><br><span class="line">                node-&gt;cport = ntohs(g-&gt;cport);</span><br><span class="line">                <span class="comment">// 加入到当前节点维护的集群server.cluster中</span></span><br><span class="line">                clusterAddNode(node);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 遍历下一个节点 */</span></span><br><span class="line">        g++;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>总结</strong><br><img src="/images/集群初始化.png" alt=""></p>
+<p><strong>参考</strong></p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a><br><a href="https://my.oschina.net/u/3474060/blog/952612" target="_blank" rel="noopener">zhaiguanjie-Redis源码剖析</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2022/05/11/【Redis】客观下线/" rel="next" title="【Redis】客观下线">
+                <i class="fa fa-chevron-left"></i> 【Redis】客观下线
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2022/05/19/【Redis】集群故障转移/" rel="prev" title="【Redis】集群故障转移">
+                【Redis】集群故障转移 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">53</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#集群间通信"><span class="nav-number">1.</span> <span class="nav-text">集群间通信</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#通信消息结构体定义"><span class="nav-number">1.1.</span> <span class="nav-text">通信消息结构体定义</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PING消息的发送"><span class="nav-number">1.2.</span> <span class="nav-text">PING消息的发送</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#构建消息头"><span class="nav-number">1.2.1.</span> <span class="nav-text">构建消息头</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#构建消息体"><span class="nav-number">1.2.2.</span> <span class="nav-text">构建消息体</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#PING消息的处理"><span class="nav-number">1.3.</span> <span class="nav-text">PING消息的处理</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

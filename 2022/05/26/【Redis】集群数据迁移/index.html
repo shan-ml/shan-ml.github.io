@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="Redis通过对KEY计算hash，将KEY映射到slot，集群中每个节点负责一部分slot的方式管理数据，slot最大个数为16384。在集群节点对应的结构体变量clusterNode中可以看到slots数组，数组的大小为CLUSTER_SLOTS除以8，CLUSTER_SLOTS的值是16384： 123456789#define CLUSTER_SLOTS 16384typedef stru">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】集群数据迁移">
+<meta property="og:url" content="http://yoursite.com/2022/05/26/【Redis】集群数据迁移/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="Redis通过对KEY计算hash，将KEY映射到slot，集群中每个节点负责一部分slot的方式管理数据，slot最大个数为16384。在集群节点对应的结构体变量clusterNode中可以看到slots数组，数组的大小为CLUSTER_SLOTS除以8，CLUSTER_SLOTS的值是16384： 123456789#define CLUSTER_SLOTS 16384typedef stru">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/images/clusterstate.jpg">
+<meta property="og:updated_time" content="2022-05-29T12:28:10.429Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】集群数据迁移">
+<meta name="twitter:description" content="Redis通过对KEY计算hash，将KEY映射到slot，集群中每个节点负责一部分slot的方式管理数据，slot最大个数为16384。在集群节点对应的结构体变量clusterNode中可以看到slots数组，数组的大小为CLUSTER_SLOTS除以8，CLUSTER_SLOTS的值是16384： 123456789#define CLUSTER_SLOTS 16384typedef stru">
+<meta name="twitter:image" content="http://yoursite.com/images/clusterstate.jpg">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2022/05/26/【Redis】集群数据迁移/"/>
+
+
+
+
+
+  <title>【Redis】集群数据迁移 | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2022/05/26/【Redis】集群数据迁移/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】集群数据迁移</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2022-05-26T23:00:00+08:00">
+                2022-05-26
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>Redis通过对KEY计算hash，将KEY映射到slot，集群中每个节点负责一部分slot的方式管理数据，slot最大个数为16384。<br>在集群节点对应的结构体变量clusterNode中可以看到slots数组，数组的大小为CLUSTER_SLOTS除以8，CLUSTER_SLOTS的值是16384：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> CLUSTER_SLOTS 16384</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">clusterNode</span> &#123;</span></span><br><span class="line">  </span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> slots[CLUSTER_SLOTS/<span class="number">8</span>];</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line"> </span><br><span class="line">&#125; clusterNode;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>因为一个字符占8位，所以数组个数为16384除以8，每一位可以表示一个slot，如果某一位的值为1，表示当前节点负责这一位对应的slot。</p>
+</blockquote>
+<p><strong>clusterState</strong></p>
+<p>clusterNode里面保存了节点相关的信息，集群数据迁移信息并未保存在clusterNode中，而是使用了clusterState结构体来保存：</p>
+<ul>
+<li>migrating_slots_to数组: 记录当前节点负责的slot迁移到了哪个节点</li>
+<li>importing_slots_from数组: 记录当前节点负责的slot是从哪个节点迁入的</li>
+<li>slots数组：记录每个slot是由哪个集群节点负责的</li>
+<li>slots_keys_count：slot中key的数量</li>
+<li>slots_to_keys：是一个字典树，记录KEY和SLOT的对应关系</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">clusterState</span> &#123;</span></span><br><span class="line">    clusterNode *myself;  <span class="comment">/* 当前节点自己 */</span></span><br><span class="line">    clusterNode *migrating_slots_to[CLUSTER_SLOTS];</span><br><span class="line">    clusterNode *importing_slots_from[CLUSTER_SLOTS];</span><br><span class="line">    clusterNode *slots[CLUSTER_SLOTS];</span><br><span class="line">    <span class="keyword">uint64_t</span> slots_keys_count[CLUSTER_SLOTS];</span><br><span class="line">    rax *slots_to_keys;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125; clusterState;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterState与clusterNode的关系</strong></p>
+<p><img src="/images/clusterstate.jpg" alt=""></p>
+<h2 id="集群数据迁移"><a href="#集群数据迁移" class="headerlink" title="集群数据迁移"></a>集群数据迁移</h2><p>在手动进行数据迁移时，需要执行以下步骤：</p>
+<ol>
+<li>在源节点和目标节点分别使用<code>CLUSTER  SETSLOT MIGRATING</code>和<code>CLUSTER  SETSLOT IMPORTING</code>标记slot迁出和迁入信息</li>
+<li>在源节点使用<code>CLUSTER  GETKEYSINSLOT</code>命令获取待迁出的KEY</li>
+<li>在源节点执行<code>MIGRATE</code>命令进行数据迁移，<code>MIGRATE</code>既支持单个KEY的迁移，也支持多个KEY的迁移</li>
+<li>在源节点和目标节点使用<code>CLUSTER SETSLOT</code>命令标记slot最终迁移节点</li>
+</ol>
+<h3 id="标记数据迁移节点"><a href="#标记数据迁移节点" class="headerlink" title="标记数据迁移节点"></a>标记数据迁移节点</h3><p>在进行数据迁移之前，首先在需要迁入的目标节点使用<code>SETSLOT</code>命令标记要将SLOT从哪个节点迁入到当前节点：</p>
+<ul>
+<li><slot>：哈希槽的值</slot></li>
+<li><node>：表示slot所在的节点</node></li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CLUSTER  SETSLOT  &lt;slot&gt;  IMPORTING  &lt;node&gt;</span><br></pre></td></tr></table></figure>
+<p>然后在源节点也就是slot所在节点使用<code>MIGRATING</code>命令将数据迁出到目标节点：</p>
+<ul>
+<li><slot>：哈希槽的值</slot></li>
+<li><node>：表示slot要迁出到的目标节点</node></li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CLUSTER  SETSLOT  &lt;slot&gt;  MIGRATING  &lt;node&gt;</span><br></pre></td></tr></table></figure>
+<p>比如slot1当前在node1中，需要将slot1迁出到node2,那么首先在nodd2上执行<code>IMPORTING</code>命令，标记slot准备从node1迁到当前节点node2中：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CLUSTER  SETSLOT  slot1  IMPORTING  node1</span><br></pre></td></tr></table></figure>
+<p>然后在node1中执行<code>MIGRATING</code>命令标记slot1需要迁移到node2：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CLUSTER  SETSLOT  slot1  MIGRATING  node2</span><br></pre></td></tr></table></figure>
+<p><strong>clusterCommand</strong><br><code>SETSLOT</code>命令的处理在clusterCommand函数（cluster.c文件中）中：</p>
+<ol>
+<li>校验当前节点是否是从节点，如果当前节点是从节点，返回错误，<code>SETSLOT</code>只能用于主节点</li>
+<li>如果是<code>migrating</code>命令，表示slot需要从当前节点迁出到其他节点，处理如下：<br>（1） 如果需要迁移的slot不在当前节点，返回错误<br>（2）如果要迁移到的目标slot节点未查询到，返回错误<br>（3）将当前节点的migrating_slots_to[slot]的值置为迁出到的目标节点，记录slot迁移到了哪个节点</li>
+<li>如果是<code>importing</code>命令，表示slot需要从其他节点迁入到当前节点<br>（1）如果要迁移的slot已经在当前节点，返回slot数据已经在当前节点的响应<br>（2）由于importing需要从slot所在节点迁移到当前节点，如果未从集群中查询slot当前所在节点，返回错误信息<br>（3）将当前节点的importing_slots_from[slot]置为slot所在节点，记录slot是从哪个节点迁入到当前节点的</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (server.cluster_enabled == <span class="number">0</span>) &#123;</span><br><span class="line">        addReplyError(c,<span class="string">"This instance has cluster support disabled"</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;argc == <span class="number">2</span> &amp;&amp; !strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"help"</span>)) &#123;</span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">    &#125; </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"setslot"</span>) &amp;&amp; c-&gt;argc &gt;= <span class="number">4</span>) &#123; <span class="comment">// 处理setslot命令</span></span><br><span class="line">        <span class="keyword">int</span> slot;</span><br><span class="line">        clusterNode *n;</span><br><span class="line">        <span class="comment">// 如果当前节点是从节点，返回错误，SETSLOT只能用于主节点</span></span><br><span class="line">        <span class="keyword">if</span> (nodeIsSlave(myself)) &#123;</span><br><span class="line">            addReplyError(c,<span class="string">"Please use SETSLOT only with masters."</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 查询slot</span></span><br><span class="line">        <span class="keyword">if</span> ((slot = getSlotOrReply(c,c-&gt;argv[<span class="number">2</span>])) == <span class="number">-1</span>) <span class="keyword">return</span>;</span><br><span class="line">        <span class="comment">// 处理migrating迁出</span></span><br><span class="line">        <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">3</span>]-&gt;ptr,<span class="string">"migrating"</span>) &amp;&amp; c-&gt;argc == <span class="number">5</span>) &#123;</span><br><span class="line">            <span class="comment">// 如果需要迁移的slot不在当前节点，返回错误</span></span><br><span class="line">            <span class="keyword">if</span> (server.cluster-&gt;slots[slot] != myself) &#123;</span><br><span class="line">                addReplyErrorFormat(c,<span class="string">"I'm not the owner of hash slot %u"</span>,slot);</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 如果要迁移到的目标节点未查询到，返回错误</span></span><br><span class="line">            <span class="keyword">if</span> ((n = clusterLookupNode(c-&gt;argv[<span class="number">4</span>]-&gt;ptr)) == <span class="literal">NULL</span>) &#123;</span><br><span class="line">                addReplyErrorFormat(c,<span class="string">"I don't know about node %s"</span>,</span><br><span class="line">                    (<span class="keyword">char</span>*)c-&gt;argv[<span class="number">4</span>]-&gt;ptr);</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 将当前节点的migrating_slots_to[slot]置为目标节点，记录slot要迁移到的节点</span></span><br><span class="line">            server.cluster-&gt;migrating_slots_to[slot] = n;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">3</span>]-&gt;ptr,<span class="string">"importing"</span>) &amp;&amp; c-&gt;argc == <span class="number">5</span>) &#123; <span class="comment">// 处理importing迁入</span></span><br><span class="line">            <span class="comment">// 如果要迁移的slot已经在当前节点</span></span><br><span class="line">            <span class="keyword">if</span> (server.cluster-&gt;slots[slot] == myself) &#123;</span><br><span class="line">                addReplyErrorFormat(c,</span><br><span class="line">                    <span class="string">"I'm already the owner of hash slot %u"</span>,slot);</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// importing需要从slot所在节点迁移到当前节点，如果未从集群中查询slot当前所在节点，返回错误信息</span></span><br><span class="line">            <span class="keyword">if</span> ((n = clusterLookupNode(c-&gt;argv[<span class="number">4</span>]-&gt;ptr)) == <span class="literal">NULL</span>) &#123;</span><br><span class="line">                addReplyErrorFormat(c,<span class="string">"I don't know about node %s"</span>,</span><br><span class="line">                    (<span class="keyword">char</span>*)c-&gt;argv[<span class="number">4</span>]-&gt;ptr);</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 记录slot是从哪个节点迁移过来的</span></span><br><span class="line">            server.cluster-&gt;importing_slots_from[slot] = n;</span><br><span class="line">        &#125; </span><br><span class="line">        <span class="comment">// 省略其他if else</span></span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">        <span class="keyword">else</span> &#123;</span><br><span class="line">            addReplyError(c,</span><br><span class="line">                <span class="string">"Invalid CLUSTER SETSLOT action or number of arguments. Try CLUSTER HELP"</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        clusterDoBeforeSleep(CLUSTER_TODO_SAVE_CONFIG|CLUSTER_TODO_UPDATE_STATE);</span><br><span class="line">        addReply(c,shared.ok);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">else</span> &#123;</span><br><span class="line">        addReplySubcommandSyntaxError(c);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="获取待迁出的key"><a href="#获取待迁出的key" class="headerlink" title="获取待迁出的key"></a>获取待迁出的key</h3><p>在标记完迁入、迁出节点后，就可以使用<code>CLUSTER  GETKEYSINSLOT</code>命令获取待迁出的KEY：</p>
+<p><slot>：哈希槽的值</slot></p>
+<p><count>：迁出KEY的数量</count></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CLUSTER  GETKEYSINSLOT  &lt;slot&gt;  &lt;count&gt;</span><br></pre></td></tr></table></figure>
+<p><code>getkeysinslot</code>命令的处理也在clusterCommand函数中，处理逻辑如下：</p>
+<ol>
+<li>从命令中解析slot的值以及count的值，count的值记为maxkeys，并校验合法性</li>
+<li>调用countKeysInSlot函数获取slot中key的数量，与maxkeys对比，如果小于maxkeys，就将maxkeys的值更新为slot中key的数量</li>
+<li>根据获取key的个数分配相应的内存空间</li>
+<li>从slot中获取key并将数据返回给客户端</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (server.cluster_enabled == <span class="number">0</span>) &#123;</span><br><span class="line">        addReplyError(c,<span class="string">"This instance has cluster support disabled"</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;argc == <span class="number">2</span> &amp;&amp; !strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"help"</span>)) &#123;</span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">    &#125; </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"getkeysinslot"</span>) &amp;&amp; c-&gt;argc == <span class="number">4</span>) &#123;</span><br><span class="line">        <span class="comment">/* CLUSTER GETKEYSINSLOT &lt;slot&gt; &lt;count&gt; */</span></span><br><span class="line">        <span class="keyword">long</span> <span class="keyword">long</span> maxkeys, slot;</span><br><span class="line">        <span class="keyword">unsigned</span> <span class="keyword">int</span> numkeys, j;</span><br><span class="line">        robj **keys;</span><br><span class="line">        <span class="comment">// 从命令中获取slot的值并转为长整型</span></span><br><span class="line">        <span class="keyword">if</span> (getLongLongFromObjectOrReply(c,c-&gt;argv[<span class="number">2</span>],&amp;slot,<span class="literal">NULL</span>) != C_OK)</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        <span class="comment">// 从命令中获取key的最大个数并转为长整型</span></span><br><span class="line">        <span class="keyword">if</span> (getLongLongFromObjectOrReply(c,c-&gt;argv[<span class="number">3</span>],&amp;maxkeys,<span class="literal">NULL</span>)</span><br><span class="line">            != C_OK)</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        <span class="comment">// 如果slot的值小于0或者大于CLUSTER_SLOTS或者key的最大个数为0</span></span><br><span class="line">        <span class="keyword">if</span> (slot &lt; <span class="number">0</span> || slot &gt;= CLUSTER_SLOTS || maxkeys &lt; <span class="number">0</span>) &#123;</span><br><span class="line">            addReplyError(c,<span class="string">"Invalid slot or number of keys"</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">      </span><br><span class="line">        <span class="comment">// 计算slot中key的数量</span></span><br><span class="line">        <span class="keyword">unsigned</span> <span class="keyword">int</span> keys_in_slot = countKeysInSlot(slot);</span><br><span class="line">        <span class="comment">// 如果maxkeys大于slot中key的数量，更新maxkeys的值为slot中key的数量</span></span><br><span class="line">        <span class="keyword">if</span> (maxkeys &gt; keys_in_slot) maxkeys = keys_in_slot;</span><br><span class="line">        <span class="comment">// 分配空间</span></span><br><span class="line">        keys = zmalloc(<span class="keyword">sizeof</span>(robj*)*maxkeys);</span><br><span class="line">        <span class="comment">// 从slot中获取key</span></span><br><span class="line">        numkeys = getKeysInSlot(slot, keys, maxkeys);</span><br><span class="line">        addReplyArrayLen(c,numkeys);</span><br><span class="line">        <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; numkeys; j++) &#123;</span><br><span class="line">            <span class="comment">// 返回key</span></span><br><span class="line">            addReplyBulk(c,keys[j]);</span><br><span class="line">            decrRefCount(keys[j]);</span><br><span class="line">        &#125;</span><br><span class="line">        zfree(keys);</span><br><span class="line">    &#125;  </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">else</span> &#123;</span><br><span class="line">        addReplySubcommandSyntaxError(c);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="数据迁移"><a href="#数据迁移" class="headerlink" title="数据迁移"></a>数据迁移</h3><h4 id="源节点数据迁移"><a href="#源节点数据迁移" class="headerlink" title="源节点数据迁移"></a>源节点数据迁移</h4><p>完成上两步之后，接下来需要在源节点中执行<code>MIGRATE</code>命令进行数据迁移，<code>MIGRATE</code>既支持单个KEY的迁移，也支持多个KEY的迁移，语法如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#</span> 单个KEY</span><br><span class="line">MIGRATE host port key dbid timeout [COPY | REPLACE | AUTH password | AUTH2 username password]</span><br><span class="line">                                    </span><br><span class="line"><span class="meta">#</span> 多个KEY</span><br><span class="line">MIGRATE host port "" dbid timeout [COPY | REPLACE | AUTH password | AUTH2 username password] KEYS key2 ... keyN</span><br></pre></td></tr></table></figure>
+<ul>
+<li>host：ip地址</li>
+<li>Port：端口</li>
+<li>key：迁移的key</li>
+<li>KEYS：如果一次迁移多个KEY，使用KEYS，后跟迁移的key1 … keyN</li>
+<li>dbid：数据库id</li>
+<li><strong>COPY：如果目标节点已经存在迁移的key，则报错，如果目标节点不存在迁移的key，则正常进行迁移，在迁移完成后删除源节点中的key</strong></li>
+<li><strong>REPLACE：如果目标节点不存在迁移的key，正常进行迁移，如果目标节点存在迁移的key，进行替换，覆盖目标节点中已经存在的key</strong></li>
+<li>AUTH：验证密码</li>
+</ul>
+<p><strong>migrateCommand</strong></p>
+<p><code>MIGRATE</code>命令对应的处理函数在migrateCommand中（cluster.c文件中），处理逻辑如下：</p>
+<ol>
+<li>解析命令中的参数，判断是否有replace、auth、keys等参数<ul>
+<li>如果有replace参数，表示在迁移数据时如果key已经在目标节点存在，进行替换</li>
+<li>如果有keys参数，表示命令中有多个key，计算命令中key的个数记为num_keys</li>
+</ul>
+</li>
+<li>处理命令中解析到的所有key，调用lookupKeyRead函数查找key：<ul>
+<li>如果查找到，将key放入kv对象中，<strong>kv中存储实际要处理的KEY，value放入ov对象中，ov中存储key对应的value</strong></li>
+<li>如果未查找到key，跳过当前key，处理下一个key</li>
+</ul>
+</li>
+<li>因为有部分key可能未查询到，所以更新实际需要处理的key的数量num_keys</li>
+<li>根据命令中的ip端口信息，与目标节点建立连接</li>
+<li>调用rioInitWithBuffer函数初始化一块缓冲区</li>
+<li>处理实际需要迁移的key，主要是将数据填入缓冲区<ul>
+<li>根据key获取过期时间，如果已过期不进行处理</li>
+<li>判断是否开启了集群，如果开启了集群将<code>RESTORE-ASKING</code>写入缓冲区，如果未开启，写入RESTORE命令</li>
+<li>将key写入缓冲区</li>
+<li><strong>调用createDumpPayload函数，创建payload，将RDB版本、CRC64校验和以及value内容写入 </strong>，目标节点收到数据时需要进行校验</li>
+<li>将payload数据填充到缓冲区</li>
+</ul>
+</li>
+<li><strong>将缓冲区的数据按照64K的块大小发送到目标节点</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br><span class="line">179</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">migrateCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    </span><br><span class="line">    robj **ov = <span class="literal">NULL</span>; <span class="comment">/* 保存要迁移的key对应的value */</span></span><br><span class="line">    robj **kv = <span class="literal">NULL</span>; <span class="comment">/* 保存要迁移的key. */</span></span><br><span class="line">    </span><br><span class="line">    <span class="keyword">int</span> first_key = <span class="number">3</span>; <span class="comment">/* 第一个key */</span></span><br><span class="line">    <span class="keyword">int</span> num_keys = <span class="number">1</span>;  <span class="comment">/* 迁移key的数量 */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 解析命令中的参数 */</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">6</span>; j &lt; c-&gt;argc; j++) &#123;</span><br><span class="line">        <span class="keyword">int</span> moreargs = (c-&gt;argc<span class="number">-1</span>) - j;</span><br><span class="line">        <span class="comment">// 如果是copy</span></span><br><span class="line">        <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[j]-&gt;ptr,<span class="string">"copy"</span>)) &#123;</span><br><span class="line">            copy = <span class="number">1</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[j]-&gt;ptr,<span class="string">"replace"</span>)) &#123; <span class="comment">// 如果是replace</span></span><br><span class="line">            replace = <span class="number">1</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[j]-&gt;ptr,<span class="string">"auth"</span>)) &#123; <span class="comment">// 如果需要验证密码</span></span><br><span class="line">            <span class="keyword">if</span> (!moreargs) &#123;</span><br><span class="line">                addReplyErrorObject(c,shared.syntaxerr);</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            j++;</span><br><span class="line">            <span class="comment">// 获取密码</span></span><br><span class="line">            password = c-&gt;argv[j]-&gt;ptr;</span><br><span class="line">            redactClientCommandArgument(c,j);</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[j]-&gt;ptr,<span class="string">"auth2"</span>)) &#123;</span><br><span class="line">            <span class="comment">// ...</span></span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[j]-&gt;ptr,<span class="string">"keys"</span>)) &#123; <span class="comment">// 如果一次迁移多个key</span></span><br><span class="line">            <span class="keyword">if</span> (sdslen(c-&gt;argv[<span class="number">3</span>]-&gt;ptr) != <span class="number">0</span>) &#123;</span><br><span class="line">                addReplyError(c,</span><br><span class="line">                    <span class="string">"When using MIGRATE KEYS option, the key argument"</span></span><br><span class="line">                    <span class="string">" must be set to the empty string"</span>);</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 或取第一个key</span></span><br><span class="line">            first_key = j+<span class="number">1</span>;</span><br><span class="line">            <span class="comment">// 计算key的数量</span></span><br><span class="line">            num_keys = c-&gt;argc - j - <span class="number">1</span>;</span><br><span class="line">            <span class="keyword">break</span>; <span class="comment">/* All the remaining args are keys. */</span></span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            addReplyErrorObject(c,shared.syntaxerr);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 校验timeout和dbid的值 */</span></span><br><span class="line">    <span class="keyword">if</span> (getLongFromObjectOrReply(c,c-&gt;argv[<span class="number">5</span>],&amp;timeout,<span class="literal">NULL</span>) != C_OK ||</span><br><span class="line">        getLongFromObjectOrReply(c,c-&gt;argv[<span class="number">4</span>],&amp;dbid,<span class="literal">NULL</span>) != C_OK)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 如果超时时间小于0，默认设置1000毫秒</span></span><br><span class="line">    <span class="keyword">if</span> (timeout &lt;= <span class="number">0</span>) timeout = <span class="number">1000</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 分配空间，kv记录在源节点中实际查找到的key</span></span><br><span class="line">    ov = zrealloc(ov,<span class="keyword">sizeof</span>(robj*)*num_keys);</span><br><span class="line">    kv = zrealloc(kv,<span class="keyword">sizeof</span>(robj*)*num_keys);</span><br><span class="line">    <span class="keyword">int</span> oi = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 处理KEY</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; num_keys; j++) &#123;</span><br><span class="line">        <span class="comment">// 如果可以从源节点查找到key</span></span><br><span class="line">        <span class="keyword">if</span> ((ov[oi] = lookupKeyRead(c-&gt;db,c-&gt;argv[first_key+j])) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">            <span class="comment">// 记录查找到的key</span></span><br><span class="line">            kv[oi] = c-&gt;argv[first_key+j];</span><br><span class="line">            <span class="comment">// 记录查找到的个数</span></span><br><span class="line">            oi++;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 只处理实际查找到的key</span></span><br><span class="line">    num_keys = oi;</span><br><span class="line">    <span class="comment">// 如果为0，不进行处理</span></span><br><span class="line">    <span class="keyword">if</span> (num_keys == <span class="number">0</span>) &#123;</span><br><span class="line">        zfree(ov); zfree(kv); <span class="comment">// 释放空间</span></span><br><span class="line">        addReplySds(c,sdsnew(<span class="string">"+NOKEY\r\n"</span>)); <span class="comment">// 返回NOKEY响应</span></span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">try_again:</span><br><span class="line">    write_error = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 与目标节点建立连接 */</span></span><br><span class="line">    cs = migrateGetSocket(c,c-&gt;argv[<span class="number">1</span>],c-&gt;argv[<span class="number">2</span>],timeout);</span><br><span class="line">    <span class="keyword">if</span> (cs == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        zfree(ov); zfree(kv);</span><br><span class="line">        <span class="keyword">return</span>; <span class="comment">/* error sent to the client by migrateGetSocket() */</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 初始化缓冲区</span></span><br><span class="line">    rioInitWithBuffer(&amp;cmd,sdsempty());</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果密码不为空，验证密码 */</span></span><br><span class="line">    <span class="keyword">if</span> (password) &#123;</span><br><span class="line">        <span class="keyword">int</span> arity = username ? <span class="number">3</span> : <span class="number">2</span>;</span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkCount(&amp;cmd,<span class="string">'*'</span>,arity));</span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkString(&amp;cmd,<span class="string">"AUTH"</span>,<span class="number">4</span>));</span><br><span class="line">        <span class="keyword">if</span> (username) &#123;</span><br><span class="line">            serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkString(&amp;cmd,username,</span><br><span class="line">                                 sdslen(username)));</span><br><span class="line">        &#125;</span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkString(&amp;cmd,password,</span><br><span class="line">            sdslen(password)));</span><br><span class="line">    &#125;</span><br><span class="line">  </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 处理KEY，只保留未过期的KEY</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; num_keys; j++) &#123;</span><br><span class="line">        <span class="keyword">long</span> <span class="keyword">long</span> ttl = <span class="number">0</span>;</span><br><span class="line">        <span class="comment">// 获取KEY的过期时间，返回-1表示未设置过期时间，否则返回过期时间</span></span><br><span class="line">        <span class="keyword">long</span> <span class="keyword">long</span> expireat = getExpire(c-&gt;db,kv[j]);</span><br><span class="line">        <span class="comment">// 如果设置了过期时间</span></span><br><span class="line">        <span class="keyword">if</span> (expireat != <span class="number">-1</span>) &#123;</span><br><span class="line">            <span class="comment">// 计算ttl：过期时间减去当前时间</span></span><br><span class="line">            ttl = expireat-mstime();</span><br><span class="line">            <span class="comment">// 如果已过期</span></span><br><span class="line">            <span class="keyword">if</span> (ttl &lt; <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">if</span> (ttl &lt; <span class="number">1</span>) ttl = <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 记录未过期的KEY */</span></span><br><span class="line">        ov[non_expired] = ov[j];</span><br><span class="line">        kv[non_expired++] = kv[j];</span><br><span class="line"></span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,</span><br><span class="line">            rioWriteBulkCount(&amp;cmd,<span class="string">'*'</span>,replace ? <span class="number">5</span> : <span class="number">4</span>));</span><br><span class="line">        <span class="comment">// 是否启用集群</span></span><br><span class="line">        <span class="keyword">if</span> (server.cluster_enabled)</span><br><span class="line">            serverAssertWithInfo(c,<span class="literal">NULL</span>,</span><br><span class="line">                rioWriteBulkString(&amp;cmd,<span class="string">"RESTORE-ASKING"</span>,<span class="number">14</span>)); <span class="comment">// 将RESTORE-ASKING命令写入缓冲区</span></span><br><span class="line">        <span class="keyword">else</span></span><br><span class="line">            serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkString(&amp;cmd,<span class="string">"RESTORE"</span>,<span class="number">7</span>)); <span class="comment">// 如果未开启集群将RESTORE命令写入缓冲区</span></span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,sdsEncodedObject(kv[j]));</span><br><span class="line">        <span class="comment">// 将key写入缓冲区</span></span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkString(&amp;cmd,kv[j]-&gt;ptr,</span><br><span class="line">                sdslen(kv[j]-&gt;ptr)));</span><br><span class="line">        <span class="comment">// 将ttl写入缓存区</span></span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkLongLong(&amp;cmd,ttl));</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 创建payload，将RDB版本、CRC64校验和以及value内容写入 */</span></span><br><span class="line">        createDumpPayload(&amp;payload,ov[j],kv[j]);</span><br><span class="line">        <span class="comment">// 将payload数据写入缓冲区</span></span><br><span class="line">        serverAssertWithInfo(c,<span class="literal">NULL</span>,</span><br><span class="line">            rioWriteBulkString(&amp;cmd,payload.io.buffer.ptr,</span><br><span class="line">                               sdslen(payload.io.buffer.ptr)));</span><br><span class="line">        sdsfree(payload.io.buffer.ptr);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果设置了REPLACE参数，将REPLACE写入缓冲区 */</span></span><br><span class="line">        <span class="keyword">if</span> (replace)</span><br><span class="line">            serverAssertWithInfo(c,<span class="literal">NULL</span>,rioWriteBulkString(&amp;cmd,<span class="string">"REPLACE"</span>,<span class="number">7</span>));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 更新实际需要处理的key */</span></span><br><span class="line">    num_keys = non_expired;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将缓冲区的数据按照64K的块大小发送到目标节点 */</span></span><br><span class="line">    errno = <span class="number">0</span>;</span><br><span class="line">    &#123;</span><br><span class="line">        sds buf = cmd.io.buffer.ptr;</span><br><span class="line">        <span class="keyword">size_t</span> pos = <span class="number">0</span>, towrite;</span><br><span class="line">        <span class="keyword">int</span> nwritten = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> ((towrite = sdslen(buf)-pos) &gt; <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="comment">// 需要发送的数据，如果超过了64K就按照64K的大小发送</span></span><br><span class="line">            towrite = (towrite &gt; (<span class="number">64</span>*<span class="number">1024</span>) ? (<span class="number">64</span>*<span class="number">1024</span>) : towrite);</span><br><span class="line">            <span class="comment">// 发送数据</span></span><br><span class="line">            nwritten = connSyncWrite(cs-&gt;conn,buf+pos,towrite,timeout);</span><br><span class="line">            <span class="keyword">if</span> (nwritten != (<span class="keyword">signed</span>)towrite) &#123;</span><br><span class="line">                write_error = <span class="number">1</span>;</span><br><span class="line">                <span class="keyword">goto</span> socket_err;</span><br><span class="line">            &#125;</span><br><span class="line">            pos += nwritten;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"> </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>createDumpPayload</strong></p>
+<p>createDumpPayload函数在cluster.c文件中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* -----------------------------------------------------------------------------</span></span><br><span class="line"><span class="comment"> * DUMP, RESTORE and MIGRATE commands</span></span><br><span class="line"><span class="comment"> * -------------------------------------------------------------------------- */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">createDumpPayload</span><span class="params">(rio *payload, robj *o, robj *key)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">char</span> buf[<span class="number">2</span>];</span><br><span class="line">    <span class="keyword">uint64_t</span> crc;</span><br><span class="line">    <span class="comment">// 初始化缓冲区</span></span><br><span class="line">    rioInitWithBuffer(payload,sdsempty());</span><br><span class="line">    <span class="comment">// 将value的数据类型写入缓冲区</span></span><br><span class="line">    serverAssert(rdbSaveObjectType(payload,o));</span><br><span class="line">    <span class="comment">// 将value写入缓冲区</span></span><br><span class="line">    serverAssert(rdbSaveObject(payload,o,key));</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* Write the footer, this is how it looks like:</span></span><br><span class="line"><span class="comment">     * ----------------+---------------------+---------------+</span></span><br><span class="line"><span class="comment">     * ... RDB payload | 2 bytes RDB version | 8 bytes CRC64 |</span></span><br><span class="line"><span class="comment">     * ----------------+---------------------+---------------+</span></span><br><span class="line"><span class="comment">     * RDB version and CRC are both in little endian.</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 设置RDB版本 */</span></span><br><span class="line">    buf[<span class="number">0</span>] = RDB_VERSION &amp; <span class="number">0xff</span>;</span><br><span class="line">    buf[<span class="number">1</span>] = (RDB_VERSION &gt;&gt; <span class="number">8</span>) &amp; <span class="number">0xff</span>;</span><br><span class="line">    payload-&gt;io.buffer.ptr = sdscatlen(payload-&gt;io.buffer.ptr,buf,<span class="number">2</span>);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 设置CRC64校验和用于校验数据 */</span></span><br><span class="line">    crc = crc64(<span class="number">0</span>,(<span class="keyword">unsigned</span> <span class="keyword">char</span>*)payload-&gt;io.buffer.ptr,</span><br><span class="line">                sdslen(payload-&gt;io.buffer.ptr));</span><br><span class="line">    memrev64ifbe(&amp;crc);</span><br><span class="line">    payload-&gt;io.buffer.ptr = sdscatlen(payload-&gt;io.buffer.ptr,&amp;crc,<span class="number">8</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="目标节点处理数据"><a href="#目标节点处理数据" class="headerlink" title="目标节点处理数据"></a>目标节点处理数据</h4><p><strong>restoreCommand</strong></p>
+<p>目标节点收到迁移的数据的处理逻辑在restoreCommand中（cluster.c文件中）：</p>
+<ol>
+<li>解析请求中的参数，判断是否有replace</li>
+<li>如果没有replace并且key已经在当前节点存在，返回错误信息</li>
+<li>调用verifyDumpPayload函数校验RDB版本和CRC校验和</li>
+<li>从请求中解析value的数据类型和value值</li>
+<li>如果设置了<code>replace</code>先删除数据库中存在的key</li>
+<li>将key和vlaue添加到节点的数据库中</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* RESTORE key ttl serialized-value [REPLACE] */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">restoreCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">long</span> <span class="keyword">long</span> ttl, lfu_freq = <span class="number">-1</span>, lru_idle = <span class="number">-1</span>, lru_clock = <span class="number">-1</span>;</span><br><span class="line">    rio payload;</span><br><span class="line">    <span class="keyword">int</span> j, type, replace = <span class="number">0</span>, absttl = <span class="number">0</span>;</span><br><span class="line">    robj *obj;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 解析请求中的参数 */</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">4</span>; j &lt; c-&gt;argc; j++) &#123;</span><br><span class="line">        <span class="keyword">int</span> additional = c-&gt;argc-j<span class="number">-1</span>;</span><br><span class="line">        <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[j]-&gt;ptr,<span class="string">"replace"</span>)) &#123; <span class="comment">// 如果有replace</span></span><br><span class="line">            replace = <span class="number">1</span>; <span class="comment">// 标记</span></span><br><span class="line">        &#125; </span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">        <span class="keyword">else</span> &#123;</span><br><span class="line">            addReplyErrorObject(c,shared.syntaxerr);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果没有replace并且key已经在数据库存在，返回错误信息 */</span></span><br><span class="line">    robj *key = c-&gt;argv[<span class="number">1</span>];</span><br><span class="line">    <span class="keyword">if</span> (!replace &amp;&amp; lookupKeyWrite(c-&gt;db,key) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        addReplyErrorObject(c,shared.busykeyerr);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* Check if the TTL value makes sense */</span></span><br><span class="line">    <span class="keyword">if</span> (getLongLongFromObjectOrReply(c,c-&gt;argv[<span class="number">2</span>],&amp;ttl,<span class="literal">NULL</span>) != C_OK) &#123;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (ttl &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        addReplyError(c,<span class="string">"Invalid TTL value, must be &gt;= 0"</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 校验RDB版本和CRC */</span></span><br><span class="line">    <span class="keyword">if</span> (verifyDumpPayload(c-&gt;argv[<span class="number">3</span>]-&gt;ptr,sdslen(c-&gt;argv[<span class="number">3</span>]-&gt;ptr)) == C_ERR)</span><br><span class="line">    &#123;</span><br><span class="line">        addReplyError(c,<span class="string">"DUMP payload version or checksum are wrong"</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    rioInitWithBuffer(&amp;payload,c-&gt;argv[<span class="number">3</span>]-&gt;ptr);</span><br><span class="line">    <span class="comment">// 解析value的数据类型和value值</span></span><br><span class="line">    <span class="keyword">if</span> (((type = rdbLoadObjectType(&amp;payload)) == <span class="number">-1</span>) ||</span><br><span class="line">        ((obj = rdbLoadObject(type,&amp;payload,key-&gt;ptr)) == <span class="literal">NULL</span>))</span><br><span class="line">    &#123;</span><br><span class="line">        addReplyError(c,<span class="string">"Bad data format"</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">int</span> deleted = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 如果设置了replace</span></span><br><span class="line">    <span class="keyword">if</span> (replace)</span><br><span class="line">        deleted = dbDelete(c-&gt;db,key); <span class="comment">// 先删除数据库中存在的key</span></span><br><span class="line">    <span class="keyword">if</span> (ttl &amp;&amp; !absttl) ttl+=mstime();</span><br><span class="line">    <span class="keyword">if</span> (ttl &amp;&amp; checkAlreadyExpired(ttl)) &#123;</span><br><span class="line">        <span class="keyword">if</span> (deleted) &#123;</span><br><span class="line">            rewriteClientCommandVector(c,<span class="number">2</span>,shared.del,key);</span><br><span class="line">            signalModifiedKey(c,c-&gt;db,key);</span><br><span class="line">            notifyKeyspaceEvent(NOTIFY_GENERIC,<span class="string">"del"</span>,key,c-&gt;db-&gt;id);</span><br><span class="line">            server.dirty++;</span><br><span class="line">        &#125;</span><br><span class="line">        decrRefCount(obj);</span><br><span class="line">        addReply(c, shared.ok);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将key和vlaue添加到节点的数据库中 */</span></span><br><span class="line">    dbAdd(c-&gt;db,key,obj);</span><br><span class="line">    <span class="keyword">if</span> (ttl) &#123;</span><br><span class="line">        setExpire(c,c-&gt;db,key,ttl);</span><br><span class="line">    &#125;</span><br><span class="line">    objectSetLRUOrLFU(obj,lfu_freq,lru_idle,lru_clock,<span class="number">1000</span>);</span><br><span class="line">    signalModifiedKey(c,c-&gt;db,key);</span><br><span class="line">    notifyKeyspaceEvent(NOTIFY_GENERIC,<span class="string">"restore"</span>,key,c-&gt;db-&gt;id);</span><br><span class="line">    addReply(c,shared.ok);</span><br><span class="line">    server.dirty++;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="标记迁移结果"><a href="#标记迁移结果" class="headerlink" title="标记迁移结果"></a>标记迁移结果</h3><p>数据迁移的最后一步，<strong>需要使用<code>CLUSTER SETSLOT</code>命令，在源节点和目标节点执行以下命令，标记slot最终所属的节点，并清除第一步中标记的迁移信息</strong>：</p>
+<p><slot>：哈希槽</slot></p>
+<p><node>：哈希槽最终所在节点id</node></p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CLUSTER SETSLOT &lt;slot&gt; NODE &lt;node&gt;</span><br></pre></td></tr></table></figure>
+<p><strong>clusterCommand</strong></p>
+<p><code>CLUSTER SETSLOT &lt;slot&gt; NODE &lt;node&gt;</code>命令的处理依旧在<strong>clusterCommand</strong>函数中，处理逻辑如下：</p>
+<ol>
+<li>根据命令中传入的nodeid查找节点记为n，如果未查询到，返回错误信息</li>
+<li>果slot已经在当前节点，但是根据nodeid查找到的节点n不是当前节点，说明slot所属节点与命令中指定的节点不一致，返回错误信息</li>
+<li><strong>在源节点上执行命令时，如果slot中key的数量为0，表示slot上的数据都已迁移完毕，而migrating_slots_to[slot]记录了slot迁移到的目标节点，既然数据已经迁移完成此时需要将migrating_slots_to[slot]迁出信息清除</strong></li>
+<li>调用clusterDelSlot函数先将slot删除<ul>
+<li>获取slot所属节点</li>
+<li>将slot所属节点ClusterNode结构体中的slots数组对应的标记位取消，表示节点不再负责此slot</li>
+<li>将slot所属节点ClusterState结构体中的slots数组对应元素置为NULL，表示当前slot所属节点为空</li>
+</ul>
+</li>
+<li><strong>调用clusterAddSlot将slot添加到最终所属的节点中</strong></li>
+<li><strong>在目标节点上执行命令时，如果slot所属节点为当前节点，并且importing_slots_from[slot]不为空， importing_slots_from[slot]中记录了slot是从哪个节点迁移过来，此时数据已经迁移完毕，清除 importing_slots_from[slot]中的迁入信息</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (server.cluster_enabled == <span class="number">0</span>) &#123;</span><br><span class="line">        addReplyError(c,<span class="string">"This instance has cluster support disabled"</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;argc == <span class="number">2</span> &amp;&amp; !strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"help"</span>)) &#123;</span><br><span class="line">        <span class="comment">// ...</span></span><br><span class="line">    &#125; </span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"setslot"</span>) &amp;&amp; c-&gt;argc &gt;= <span class="number">4</span>) &#123; <span class="comment">// 处理setslot命令</span></span><br><span class="line">        <span class="keyword">int</span> slot;</span><br><span class="line">        clusterNode *n;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (nodeIsSlave(myself)) &#123;</span><br><span class="line">            addReplyError(c,<span class="string">"Please use SETSLOT only with masters."</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> ((slot = getSlotOrReply(c,c-&gt;argv[<span class="number">2</span>])) == <span class="number">-1</span>) <span class="keyword">return</span>;</span><br><span class="line">        <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">3</span>]-&gt;ptr,<span class="string">"migrating"</span>) &amp;&amp; c-&gt;argc == <span class="number">5</span>) &#123;</span><br><span class="line">            <span class="comment">// migrating处理</span></span><br><span class="line">            <span class="comment">// ...</span></span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">3</span>]-&gt;ptr,<span class="string">"importing"</span>) &amp;&amp; c-&gt;argc == <span class="number">5</span>) &#123;</span><br><span class="line">            <span class="comment">// importing处理</span></span><br><span class="line">            <span class="comment">// ...</span></span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">3</span>]-&gt;ptr,<span class="string">"stable"</span>) &amp;&amp; c-&gt;argc == <span class="number">4</span>) &#123;</span><br><span class="line">            <span class="comment">// stable处理</span></span><br><span class="line">            <span class="comment">// ...</span></span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">3</span>]-&gt;ptr,<span class="string">"node"</span>) &amp;&amp; c-&gt;argc == <span class="number">5</span>) &#123;</span><br><span class="line">            <span class="comment">/* CLUSTER SETSLOT &lt;SLOT&gt; NODE &lt;NODE ID&gt; 命令处理 */</span></span><br><span class="line">            <span class="comment">// 根据nodeid查找节点</span></span><br><span class="line">            clusterNode *n = clusterLookupNode(c-&gt;argv[<span class="number">4</span>]-&gt;ptr);</span><br><span class="line">            <span class="comment">// 如果未查询到，返回错误信息</span></span><br><span class="line">            <span class="keyword">if</span> (!n) &#123;</span><br><span class="line">                addReplyErrorFormat(c,<span class="string">"Unknown node %s"</span>,</span><br><span class="line">                    (<span class="keyword">char</span>*)c-&gt;argv[<span class="number">4</span>]-&gt;ptr);</span><br><span class="line">                <span class="keyword">return</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">/* 如果slot已经在当前节点，但是根据node id查找到的节点不是当前节点，返回错误信息*/</span></span><br><span class="line">            <span class="keyword">if</span> (server.cluster-&gt;slots[slot] == myself &amp;&amp; n != myself) &#123;</span><br><span class="line">                <span class="keyword">if</span> (countKeysInSlot(slot) != <span class="number">0</span>) &#123;</span><br><span class="line">                    addReplyErrorFormat(c,</span><br><span class="line">                        <span class="string">"Can't assign hashslot %d to a different node "</span></span><br><span class="line">                        <span class="string">"while I still hold keys for this hash slot."</span>, slot);</span><br><span class="line">                    <span class="keyword">return</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">            </span><br><span class="line">            <span class="comment">/* 在源节点上执行命令时 */</span></span><br><span class="line">            <span class="comment">/* 如果slot中key的数量为0，表示slot上的数据都已迁移完毕，而migrating_slots_to[slot]记录了slot迁移到的目标节点，既然数据已经迁移完成此时可以将迁移信息清除*/</span></span><br><span class="line">            <span class="keyword">if</span> (countKeysInSlot(slot) == <span class="number">0</span> &amp;&amp;</span><br><span class="line">                server.cluster-&gt;migrating_slots_to[slot])</span><br><span class="line">                server.cluster-&gt;migrating_slots_to[slot] = <span class="literal">NULL</span>;<span class="comment">// 清除迁移信息</span></span><br><span class="line">            <span class="comment">// 先删除slot</span></span><br><span class="line">            clusterDelSlot(slot);</span><br><span class="line">            <span class="comment">// 添加slot到节点n</span></span><br><span class="line">            clusterAddSlot(n,slot);</span><br><span class="line"></span><br><span class="line">            <span class="comment">/* 在目标节点上执行命令时 */</span></span><br><span class="line">            <span class="comment">/* 如果slot所属节点为当前节点，并且importing_slots_from[slot]不为空， importing_slots_from[slot]中记录了slot是从哪个节点迁移过来*/</span></span><br><span class="line">            <span class="keyword">if</span> (n == myself &amp;&amp;</span><br><span class="line">                server.cluster-&gt;importing_slots_from[slot])</span><br><span class="line">            &#123;</span><br><span class="line">                <span class="comment">/* 更新节点的configEpoch */</span></span><br><span class="line">                <span class="keyword">if</span> (clusterBumpConfigEpochWithoutConsensus() == C_OK) &#123;</span><br><span class="line">                    serverLog(LL_WARNING,</span><br><span class="line">                        <span class="string">"configEpoch updated after importing slot %d"</span>, slot);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="comment">// 清除importing_slots_from[slot]迁移信息</span></span><br><span class="line">                server.cluster-&gt;importing_slots_from[slot] = <span class="literal">NULL</span>;</span><br><span class="line">                <span class="comment">/* 广播PONG消息，让其他节点尽快知道slot的最新信息 */</span></span><br><span class="line">                clusterBroadcastPong(CLUSTER_BROADCAST_ALL);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            addReplyError(c,</span><br><span class="line">                <span class="string">"Invalid CLUSTER SETSLOT action or number of arguments. Try CLUSTER HELP"</span>);</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        clusterDoBeforeSleep(CLUSTER_TODO_SAVE_CONFIG|CLUSTER_TODO_UPDATE_STATE);</span><br><span class="line">        addReply(c,shared.ok);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">else</span> &#123;</span><br><span class="line">        addReplySubcommandSyntaxError(c);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>参考</strong></p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2022/05/19/【Redis】集群故障转移/" rel="next" title="【Redis】集群故障转移">
+                <i class="fa fa-chevron-left"></i> 【Redis】集群故障转移
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2022/05/26/【Redis】集群请求命令处理/" rel="prev" title="【Redis】集群请求命令处理">
+                【Redis】集群请求命令处理 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">53</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#集群数据迁移"><span class="nav-number">1.</span> <span class="nav-text">集群数据迁移</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#标记数据迁移节点"><span class="nav-number">1.1.</span> <span class="nav-text">标记数据迁移节点</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#获取待迁出的key"><span class="nav-number">1.2.</span> <span class="nav-text">获取待迁出的key</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#数据迁移"><span class="nav-number">1.3.</span> <span class="nav-text">数据迁移</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#源节点数据迁移"><span class="nav-number">1.3.1.</span> <span class="nav-text">源节点数据迁移</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#目标节点处理数据"><span class="nav-number">1.3.2.</span> <span class="nav-text">目标节点处理数据</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#标记迁移结果"><span class="nav-number">1.4.</span> <span class="nav-text">标记迁移结果</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

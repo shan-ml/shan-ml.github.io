@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在sentinelHandleRedisInstance函数中，如果是主节点，需要做如下处理： 1234567891011121314151617void sentinelHandleRedisInstance(sentinelRedisInstance *ri) &amp;#123;     // 省略...        // 如果是主节点    if (ri-&amp;gt;flags &amp;amp; SRI_">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】客观下线">
+<meta property="og:url" content="http://yoursite.com/2022/05/11/【Redis】客观下线/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="在sentinelHandleRedisInstance函数中，如果是主节点，需要做如下处理： 1234567891011121314151617void sentinelHandleRedisInstance(sentinelRedisInstance *ri) &amp;#123;     // 省略...        // 如果是主节点    if (ri-&amp;gt;flags &amp;amp; SRI_">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/images/客观下线.png">
+<meta property="og:updated_time" content="2022-05-29T12:16:53.435Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】客观下线">
+<meta name="twitter:description" content="在sentinelHandleRedisInstance函数中，如果是主节点，需要做如下处理： 1234567891011121314151617void sentinelHandleRedisInstance(sentinelRedisInstance *ri) &amp;#123;     // 省略...        // 如果是主节点    if (ri-&amp;gt;flags &amp;amp; SRI_">
+<meta name="twitter:image" content="http://yoursite.com/images/客观下线.png">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2022/05/11/【Redis】客观下线/"/>
+
+
+
+
+
+  <title>【Redis】客观下线 | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2022/05/11/【Redis】客观下线/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】客观下线</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2022-05-11T23:00:00+08:00">
+                2022-05-11
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在sentinelHandleRedisInstance函数中，如果是主节点，需要做如下处理：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelHandleRedisInstance</span><span class="params">(sentinelRedisInstance *ri)</span> </span>&#123; </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 如果是主节点</span></span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;flags &amp; SRI_MASTER) &#123;</span><br><span class="line">        <span class="comment">// 检查是否主观下线</span></span><br><span class="line">        sentinelCheckObjectivelyDown(ri);</span><br><span class="line">        <span class="comment">// 是否需要开始故障切换</span></span><br><span class="line">        <span class="keyword">if</span> (sentinelStartFailoverIfNeeded(ri))</span><br><span class="line">            <span class="comment">// 获取其他哨兵实例对节点状态的判断</span></span><br><span class="line">            sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_ASK_FORCED);</span><br><span class="line">        <span class="comment">// 故障切换状态机</span></span><br><span class="line">        sentinelFailoverStateMachine(ri);</span><br><span class="line">        <span class="comment">// 获取其他哨兵实例对节点状态的判断</span></span><br><span class="line">        sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_NO_FLAGS);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>节点的状态定义</strong><br><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SRI_MASTER  (1&lt;&lt;0) <span class="comment">/* master主节点 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SRI_SLAVE   (1&lt;&lt;1) <span class="comment">/* slave从节点 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SRI_SENTINEL (1&lt;&lt;2) <span class="comment">/* 哨兵节点 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SRI_S_DOWN (1&lt;&lt;3)   <span class="comment">/* 主观下线 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SRI_O_DOWN (1&lt;&lt;4)   <span class="comment">/* 客观下线 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SRI_MASTER_DOWN (1&lt;&lt;5) <span class="comment">/* 节点下线 */</span></span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SRI_FAILOVER_IN_PROGRESS (1&lt;&lt;6) <span class="comment">/* 正在执行master节点的故障切换</span></span></span><br><span class="line"><span class="meta"><span class="comment">换 */</span></span></span><br></pre></td></tr></table></figure></p>
+<h3 id="客观下线"><a href="#客观下线" class="headerlink" title="客观下线"></a>客观下线</h3><p><strong>sentinelCheckObjectivelyDown</strong></p>
+<p>sentinelCheckObjectivelyDown函数用于判断master节点是否客观下线：</p>
+<ol>
+<li><strong>首先确认主节点是否已经被哨兵标记为主观下线</strong>，如果已经主观下线，quorum的值置为1，表示当前已经有1个哨兵认为master主观下线，进行第2步</li>
+<li>master-&gt;sentinels存储了监控当前master的其他哨兵节点，<strong>遍历其他哨兵节点，通过flag标识中是否有SRI_MASTER_DOWN状态判断其他哨兵对MASTER节点下线的判断，如果有则认为MASTER下线，对quorum数量加1</strong></li>
+<li>遍历结束后<strong>判断quorum的数量是否大于master-&gt;quorum设置的数量，也就是是否有过半的哨兵认为主节点下线</strong>，如果是将odown置为1，认为主节点客观下线</li>
+<li>根据odown的值判断主节点是否客观下线<ul>
+<li>如果客观下线，确认master-&gt;flags是否有SRI_O_DOWN状态，如果没有，发布+odown客观下线事件并将master-&gt;flags置为SRI_O_DOWN状态</li>
+<li>如果没有客观下线，校验master-&gt;flags是否有SRI_O_DOWN状态，如果有，需要发布-odown事件，取消master的客观下线标记（master-&gt;flags的SRI_O_DOWN状态取消）</li>
+</ul>
+</li>
+</ol>
+<p>可以看到，master节点客观下线需要根据其他哨兵实例对主节点的判断来共同决定，具体是通过其他哨兵实例的flag中是否有SRI_MASTER_DOWN状态来判断的，<strong>如果认为master下线的哨兵个数超过了master节点中的quorum设置，master节点将被认定为客观下线，发布+odown客观下线事件</strong>，关于SRI_MASTER_DOWN状态是在哪里设置的在后面会讲到。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelCheckObjectivelyDown</span><span class="params">(sentinelRedisInstance *master)</span> </span>&#123;</span><br><span class="line">    dictIterator *di;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> quorum = <span class="number">0</span>, odown = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 判断主节点是否被标记为主观下线SRI_S_DOWN</span></span><br><span class="line">    <span class="keyword">if</span> (master-&gt;flags &amp; SRI_S_DOWN) &#123;</span><br><span class="line">        <span class="comment">/* quorum初始化为1 */</span></span><br><span class="line">        quorum = <span class="number">1</span>; </span><br><span class="line">        <span class="comment">/* 遍历监听主节点的其他哨兵实例. */</span></span><br><span class="line">        di = dictGetIterator(master-&gt;sentinels);</span><br><span class="line">        <span class="keyword">while</span>((de = dictNext(di)) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">            <span class="comment">// 获取哨兵实例</span></span><br><span class="line">            sentinelRedisInstance *ri = dictGetVal(de);</span><br><span class="line">            <span class="comment">// 判断其他哨兵实例是否把master节点标记为下线</span></span><br><span class="line">            <span class="keyword">if</span> (ri-&gt;flags &amp; SRI_MASTER_DOWN) quorum++;</span><br><span class="line">        &#125;</span><br><span class="line">        dictReleaseIterator(di);</span><br><span class="line">        <span class="comment">// 如果大于master-&gt;quorum，也就是过半的哨兵认为主节点已经下线，标记客观下线</span></span><br><span class="line">        <span class="keyword">if</span> (quorum &gt;= master-&gt;quorum) odown = <span class="number">1</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 如果客观下线</span></span><br><span class="line">    <span class="keyword">if</span> (odown) &#123;</span><br><span class="line">        <span class="keyword">if</span> ((master-&gt;flags &amp; SRI_O_DOWN) == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="comment">// 发布+odown客观下线事件</span></span><br><span class="line">            sentinelEvent(LL_WARNING,<span class="string">"+odown"</span>,master,<span class="string">"%@ #quorum %d/%d"</span>,</span><br><span class="line">                quorum, master-&gt;quorum);</span><br><span class="line">            <span class="comment">// 将MASTER节点标记为SRI_O_DOWN</span></span><br><span class="line">            master-&gt;flags |= SRI_O_DOWN;</span><br><span class="line">            <span class="comment">// 标记客观下线的时间</span></span><br><span class="line">            master-&gt;o_down_since_time = mstime();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">// 非客观下线，判断master是否有客观下线标识</span></span><br><span class="line">        <span class="keyword">if</span> (master-&gt;flags &amp; SRI_O_DOWN) &#123;</span><br><span class="line">            <span class="comment">// 发布-odown事件</span></span><br><span class="line">            sentinelEvent(LL_WARNING,<span class="string">"-odown"</span>,master,<span class="string">"%@"</span>);</span><br><span class="line">            <span class="comment">// 取消master的客观下线标识</span></span><br><span class="line">            master-&gt;flags &amp;= ~SRI_O_DOWN;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="是否需要执行故障切换"><a href="#是否需要执行故障切换" class="headerlink" title="是否需要执行故障切换"></a>是否需要执行故障切换</h3><p><strong>sentinelStartFailoverIfNeeded</strong></p>
+<p>sentinelStartFailoverIfNeeded用于判断是否需要执行故障切换，可以开始故障切换的条件有三个：</p>
+<ol>
+<li><strong>master节点被认为客观下线（SRI_O_DOWN）</strong></li>
+<li><strong>当前没有在进行故障切换</strong>（状态不是SRI_FAILOVER_IN_PROGRESS）</li>
+<li>距离上次执行故障切换的时间，超过了故障切换超时时间设置的2倍，意味着<strong>上一次执行故障切换的时间已超时</strong>，可以重新进行故障切换</li>
+</ol>
+<p>同时满足以上三个条件，达到执行故障切换的标准，<strong>调用sentinelStartFailover函数</strong>，将故障切换的状态改为待执行。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">sentinelStartFailoverIfNeeded</span><span class="params">(sentinelRedisInstance *master)</span> </span>&#123;</span><br><span class="line">    <span class="comment">/* 如果MASTER不是客观下线，直接返回 */</span></span><br><span class="line">    <span class="keyword">if</span> (!(master-&gt;flags &amp; SRI_O_DOWN)) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果当前已经在执行故障切换直接返回 */</span></span><br><span class="line">    <span class="keyword">if</span> (master-&gt;flags &amp; SRI_FAILOVER_IN_PROGRESS) <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 判断距离上次执行故障切换的时间，如果小于failover_timeout配置项的2倍，表示上次故障切换还未达到超时设置，所以本次不能执行*/</span></span><br><span class="line">    <span class="keyword">if</span> (mstime() - master-&gt;failover_start_time &lt;</span><br><span class="line">        master-&gt;failover_timeout*<span class="number">2</span>)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">if</span> (master-&gt;failover_delay_logged != master-&gt;failover_start_time) &#123;</span><br><span class="line">            <span class="keyword">time_t</span> clock = (master-&gt;failover_start_time +</span><br><span class="line">                            master-&gt;failover_timeout*<span class="number">2</span>) / <span class="number">1000</span>;</span><br><span class="line">            <span class="keyword">char</span> ctimebuf[<span class="number">26</span>];</span><br><span class="line"></span><br><span class="line">            ctime_r(&amp;clock,ctimebuf);</span><br><span class="line">            ctimebuf[<span class="number">24</span>] = <span class="string">'\0'</span>; <span class="comment">/* Remove newline. */</span></span><br><span class="line">            master-&gt;failover_delay_logged = master-&gt;failover_start_time;</span><br><span class="line">            serverLog(LL_WARNING,</span><br><span class="line">                <span class="string">"Next failover delay: I will not start a failover before %s"</span>,</span><br><span class="line">                ctimebuf);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 开始故障切换（只更改了故障切换状态）</span></span><br><span class="line">    sentinelStartFailover(master);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="sentinelStartFailover"><a href="#sentinelStartFailover" class="headerlink" title="sentinelStartFailover"></a>sentinelStartFailover</h4><p>可以看到sentinelStartFailover函数<strong>并没有直接进行故障切换，而是更改了一些状态</strong>：</p>
+<ol>
+<li>将failover_state置为了<strong>SENTINEL_FAILOVER_STATE_WAIT_START</strong>等待开始执行状态</li>
+<li>将master节点的flags设置为<strong>SRI_FAILOVER_IN_PROGRESS</strong>故障切换执行中状态</li>
+<li><strong>将master的failover_epoch设置为当前哨兵的投票轮次current_epoch + 1 </strong>，在选举leader时会用到</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelStartFailover</span><span class="params">(sentinelRedisInstance *master)</span> </span>&#123;</span><br><span class="line">    serverAssert(master-&gt;flags &amp; SRI_MASTER);</span><br><span class="line">    <span class="comment">// 将状态更改为等待开始执行故障切换</span></span><br><span class="line">    master-&gt;failover_state = SENTINEL_FAILOVER_STATE_WAIT_START;</span><br><span class="line">    <span class="comment">// 设置为故障切换执行中状态</span></span><br><span class="line">    master-&gt;flags |= SRI_FAILOVER_IN_PROGRESS;</span><br><span class="line">    <span class="comment">// 设置failover_epoch故障切换轮次</span></span><br><span class="line">    master-&gt;failover_epoch = ++sentinel.current_epoch;</span><br><span class="line">    sentinelEvent(LL_WARNING,<span class="string">"+new-epoch"</span>,master,<span class="string">"%llu"</span>,</span><br><span class="line">        (<span class="keyword">unsigned</span> <span class="keyword">long</span> <span class="keyword">long</span>) sentinel.current_epoch);</span><br><span class="line">    <span class="comment">// 发布事件</span></span><br><span class="line">    sentinelEvent(LL_WARNING,<span class="string">"+try-failover"</span>,master,<span class="string">"%@"</span>);</span><br><span class="line">    master-&gt;failover_start_time = mstime()+rand()%SENTINEL_MAX_DESYNC;</span><br><span class="line">    master-&gt;failover_state_change_time = mstime();</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="获取哨兵实例对主节点状态判断"><a href="#获取哨兵实例对主节点状态判断" class="headerlink" title="获取哨兵实例对主节点状态判断"></a>获取哨兵实例对主节点状态判断</h3><p>在sentinelHandleRedisInstance函数中，可以看到sentinelStartFailoverIfNeeded条件成立时以及函数的最后都调用了sentinelAskMasterStateToOtherSentinels，接下来就去看看sentinelAskMasterStateToOtherSentinels里面都做了什么：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (ri-&gt;flags &amp; SRI_MASTER) &#123;</span><br><span class="line">    sentinelCheckObjectivelyDown(ri);</span><br><span class="line">    <span class="keyword">if</span> (sentinelStartFailoverIfNeeded(ri))</span><br><span class="line">        <span class="comment">// 获取其他哨兵实例对主节点的状态判断，这里传入的参数是SENTINEL_ASK_FORCED</span></span><br><span class="line">        sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_ASK_FORCED);</span><br><span class="line">    sentinelFailoverStateMachine(ri);</span><br><span class="line">    <span class="comment">// 获取其他哨兵实例对主节点的状态判断，这里传入的参数是SENTINEL_NO_FLAGS</span></span><br><span class="line">    sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_NO_FLAGS);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="is-master-down-by-addr命令发送"><a href="#is-master-down-by-addr命令发送" class="headerlink" title="is-master-down-by-addr命令发送"></a>is-master-down-by-addr命令发送</h4><p><strong>sentinelAskMasterStateToOtherSentinels</strong></p>
+<p>sentinelAskMasterStateToOtherSentinels函数用于向其他哨兵实例发送is-master-down-by-addr命令获取其他哨兵实例对主节点状态的判断，它会遍历监听同一主节点的其他哨兵实例进行处理:</p>
+<ol>
+<li>获取每一个哨兵实例</li>
+<li>计算距离每个哨兵实例上一次收到IS-MASTER-DOWN-BY-ADDR命令回复时间的间隔</li>
+<li>如果距离上次收到回复的时间已经超过了SENTINEL_ASK_PERIOD周期的5倍，清空哨兵节点flag中的SRI_MASTER_DOWN状态和leader</li>
+<li>如果master节点已经是下线状态SRI_S_DOWN，不需要进行处理，回到第一步处理下一个哨兵</li>
+<li>如果哨兵节点用于发送命令的link连接处于未连接状态，不处理，回到第一步处理下一个哨兵</li>
+<li>如果不是强制发送命令（入参的flag是SENTINEL_ASK_FORCED时），并且距离上次收到回复命令的时间还在SENTINEL_ASK_PERIOD周期内，不处理，回到第一步处理下一个哨兵</li>
+<li>通过redisAsyncCommand函数发送发送is-master-down-by-addr命令，sentinelReceiveIsMasterDownReply为处理函数，redisAsyncCommand函数有如下参数：<ul>
+<li>用于发送请求的连接：ri-&gt;link-&gt;cc</li>
+<li><strong>收到命令返回结果时对应的处理函数：sentinelReceiveIsMasterDownReply</strong></li>
+<li><strong>master节点的ip</strong>：announceSentinelAddr(master-&gt;addr)</li>
+<li><strong>master节点端口</strong>：port</li>
+<li><strong>当前哨兵的投票轮次</strong>：sentinel.current_epoch</li>
+<li>实例ID：<strong>master-&gt;failover_state &gt; SENTINEL_FAILOVER_STATE_NONE时表示要执行故障切换，此时传入当前哨兵的myid，否则传入*</strong></li>
+</ul>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelAskMasterStateToOtherSentinels</span><span class="params">(sentinelRedisInstance *master, <span class="keyword">int</span> flags)</span> </span>&#123;</span><br><span class="line">    dictIterator *di;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    <span class="comment">// 遍历监听主节点的其他哨兵实例</span></span><br><span class="line">    di = dictGetIterator(master-&gt;sentinels);</span><br><span class="line">    <span class="keyword">while</span>((de = dictNext(di)) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="comment">// 获取每一个哨兵实例</span></span><br><span class="line">        sentinelRedisInstance *ri = dictGetVal(de);</span><br><span class="line">        <span class="comment">// 计算距离上一次收到IS-MASTER-DOWN-BY-ADDR命令回复时间的间隔</span></span><br><span class="line">        <span class="keyword">mstime_t</span> elapsed = mstime() - ri-&gt;last_master_down_reply_time;</span><br><span class="line">        <span class="keyword">char</span> port[<span class="number">32</span>];</span><br><span class="line">        <span class="keyword">int</span> retval;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果距离上次收到回复的时间已经超过了SENTINEL_ASK_PERIOD周期的5倍，清空相关设置 */</span></span><br><span class="line">        <span class="keyword">if</span> (elapsed &gt; SENTINEL_ASK_PERIOD*<span class="number">5</span>) &#123;</span><br><span class="line">            <span class="comment">// 取消SRI_MASTER_DOWN状态</span></span><br><span class="line">            ri-&gt;flags &amp;= ~SRI_MASTER_DOWN;</span><br><span class="line">            sdsfree(ri-&gt;leader);</span><br><span class="line">            <span class="comment">// leader置为null</span></span><br><span class="line">            ri-&gt;leader = <span class="literal">NULL</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 如果master已经是下线状态</span></span><br><span class="line">        <span class="keyword">if</span> ((master-&gt;flags &amp; SRI_S_DOWN) == <span class="number">0</span>) <span class="keyword">continue</span>;</span><br><span class="line">        <span class="comment">// 如果已经连接中断</span></span><br><span class="line">        <span class="keyword">if</span> (ri-&gt;link-&gt;disconnected) <span class="keyword">continue</span>;</span><br><span class="line">        <span class="comment">// 如果不是强制发送命令状态SENTINEL_ASK_FORCED，并且距离上次收到回复命令的时间还在SENTINEL_ASK_PERIOD周期内，不处理，回到第一步处理下一个哨兵</span></span><br><span class="line">        <span class="keyword">if</span> (!(flags &amp; SENTINEL_ASK_FORCED) &amp;&amp;</span><br><span class="line">            mstime() - ri-&gt;last_master_down_reply_time &lt; SENTINEL_ASK_PERIOD)</span><br><span class="line">            <span class="keyword">continue</span>;</span><br><span class="line"></span><br><span class="line">        ll2string(port,<span class="keyword">sizeof</span>(port),master-&gt;addr-&gt;port);</span><br><span class="line">        <span class="comment">// 发送is-master-down-by-addr命令，sentinelReceiveIsMasterDownReply为处理函数</span></span><br><span class="line">        retval = redisAsyncCommand(ri-&gt;link-&gt;cc,</span><br><span class="line">                    sentinelReceiveIsMasterDownReply, ri,</span><br><span class="line">                    <span class="string">"%s is-master-down-by-addr %s %s %llu %s"</span>,</span><br><span class="line">                    sentinelInstanceMapCommand(ri,<span class="string">"SENTINEL"</span>),</span><br><span class="line">                    announceSentinelAddr(master-&gt;addr), port,</span><br><span class="line">                    sentinel.current_epoch,</span><br><span class="line">                    (master-&gt;failover_state &gt; SENTINEL_FAILOVER_STATE_NONE) ?</span><br><span class="line">                    sentinel.myid : <span class="string">"*"</span>);</span><br><span class="line">        <span class="keyword">if</span> (retval == C_OK) ri-&gt;link-&gt;pending_commands++;</span><br><span class="line">    &#125;</span><br><span class="line">    dictReleaseIterator(di);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="is-master-down-by-addr命令处理"><a href="#is-master-down-by-addr命令处理" class="headerlink" title="is-master-down-by-addr命令处理"></a>is-master-down-by-addr命令处理</h4><p><strong>sentinelCommand</strong></p>
+<p>其他哨兵实例收到is-master-down-by-addr命令之后的处理逻辑在sentinelCommand函数中可以找到：</p>
+<ol>
+<li>根据请求传入的ip和端口信息获取主节点的sentinelRedisInstance实例对象（在发送is-master-down-by-addr命令的redisAsyncCommand函数中传入了主节点的ip和端口）</li>
+<li>如果不是TILT模式，校验sentinelRedisInstance对象是否是主节点并且主节点被标记为主观下线，如果条件都成立表示主节点已经主观下线，将isdown置为1</li>
+<li>判断请求参数中的runid是否不为*，如果不为*表示当前需要进行leader选举，<strong>调用sentinelVoteLeader选举哨兵Leader</strong></li>
+<li>发送is-master-down-by-addr命令的回复，将对<strong>主节点主观下线的判断、选出的leader节点的runid、投票轮次leader_epoch返回给发送命令哨兵</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line"> <span class="keyword">if</span> (c-&gt;argc == <span class="number">2</span> &amp;&amp; !strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"help"</span>)) &#123;</span><br><span class="line"> </span><br><span class="line"> &#125;</span><br><span class="line"> <span class="comment">// 省略其他else if...</span></span><br><span class="line"> <span class="comment">// 如果是is-master-down-by-addr命令</span></span><br><span class="line"> <span class="keyword">else</span> <span class="keyword">if</span> (!strcasecmp(c-&gt;argv[<span class="number">1</span>]-&gt;ptr,<span class="string">"is-master-down-by-addr"</span>)) &#123;</span><br><span class="line">        <span class="comment">/* SENTINEL IS-MASTER-DOWN-BY-ADDR &lt;ip&gt; &lt;port&gt; &lt;current-epoch&gt; &lt;runid&gt;</span></span><br><span class="line"><span class="comment">         *</span></span><br><span class="line"><span class="comment">         * 参数说明:</span></span><br><span class="line"><span class="comment">         * ip和端口：哨兵检测的主节点的ip和端口</span></span><br><span class="line"><span class="comment">         * current-epoch：是故障切换中当前投票的轮次，每一个哨兵在一轮投票中只能投一次</span></span><br><span class="line"><span class="comment">         * runid：如果需要执行故障切换，传入的是哨兵的myid，否则传入的是 *</span></span><br><span class="line"><span class="comment">         */</span></span><br><span class="line">        sentinelRedisInstance *ri;</span><br><span class="line">        <span class="keyword">long</span> <span class="keyword">long</span> req_epoch;</span><br><span class="line">        <span class="keyword">uint64_t</span> leader_epoch = <span class="number">0</span>; <span class="comment">// 默认为0</span></span><br><span class="line">        <span class="keyword">char</span> *leader = <span class="literal">NULL</span>;</span><br><span class="line">        <span class="keyword">long</span> port;</span><br><span class="line">        <span class="keyword">int</span> isdown = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> (c-&gt;argc != <span class="number">6</span>) <span class="keyword">goto</span> numargserr;</span><br><span class="line">        <span class="keyword">if</span> (getLongFromObjectOrReply(c,c-&gt;argv[<span class="number">3</span>],&amp;port,<span class="literal">NULL</span>) != C_OK ||</span><br><span class="line">            getLongLongFromObjectOrReply(c,c-&gt;argv[<span class="number">4</span>],&amp;req_epoch,<span class="literal">NULL</span>)</span><br><span class="line">                                                              != C_OK)</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        <span class="comment">// 根据请求传入的ip和端口信息获取对应的哨兵实例，也就是监控的master节点</span></span><br><span class="line">        ri = getSentinelRedisInstanceByAddrAndRunID(sentinel.masters,</span><br><span class="line">            c-&gt;argv[<span class="number">2</span>]-&gt;ptr,port,<span class="literal">NULL</span>);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果不是TILT模式，校验是否是主节点并且主节点被标记为主观下线 */</span></span><br><span class="line">        <span class="keyword">if</span> (!sentinel.tilt &amp;&amp; ri &amp;&amp; (ri-&gt;flags &amp; SRI_S_DOWN) &amp;&amp;</span><br><span class="line">                                    (ri-&gt;flags &amp; SRI_MASTER))</span><br><span class="line">            isdown = <span class="number">1</span>;<span class="comment">// 确定主观下线</span></span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 如果是主节点并且传入的runid不为*，调用sentinelVoteLeader选举Leader执行故障切换 */</span></span><br><span class="line">        <span class="keyword">if</span> (ri &amp;&amp; ri-&gt;flags &amp; SRI_MASTER &amp;&amp; strcasecmp(c-&gt;argv[<span class="number">5</span>]-&gt;ptr,<span class="string">"*"</span>)) &#123;</span><br><span class="line">            <span class="comment">// 选举leader</span></span><br><span class="line">            leader = sentinelVoteLeader(ri,(<span class="keyword">uint64_t</span>)req_epoch,</span><br><span class="line">                                            c-&gt;argv[<span class="number">5</span>]-&gt;ptr,</span><br><span class="line">                                            &amp;leader_epoch);</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* 发送回复包含三部分:</span></span><br><span class="line"><span class="comment">         * 下线状态, 选出的leader, leader的投票轮次leader_epoch */</span></span><br><span class="line">        addReplyArrayLen(c,<span class="number">3</span>);</span><br><span class="line">        <span class="comment">// 下线状态</span></span><br><span class="line">        addReply(c, isdown ? shared.cone : shared.czero);</span><br><span class="line">        <span class="comment">// leader不为空传入leader否则传入*</span></span><br><span class="line">        addReplyBulkCString(c, leader ? leader : <span class="string">"*"</span>);</span><br><span class="line">        <span class="comment">// 投票轮次</span></span><br><span class="line">        addReplyLongLong(c, (<span class="keyword">long</span> <span class="keyword">long</span>)leader_epoch);</span><br><span class="line">        <span class="keyword">if</span> (leader) sdsfree(leader);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 省略其他else if...</span></span><br><span class="line">    <span class="keyword">else</span> &#123;</span><br><span class="line">        addReplySubcommandSyntaxError(c);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="is-master-down-by-addr回复处理"><a href="#is-master-down-by-addr回复处理" class="headerlink" title="is-master-down-by-addr回复处理"></a>is-master-down-by-addr回复处理</h4><p><strong>sentinelReceiveIsMasterDownReply</strong></p>
+<p>在sentinelCommand中对命令处理之后发送了返回数据，数据里面包含主观下线的判断、leader的runid以及投票轮次leader_epoch，对返回数据的处理在sentinelReceiveIsMasterDownReply函数中：</p>
+<ol>
+<li>如果回复者也标记了节点主观下线，<strong>将哨兵实例的flags状态置为SRI_MASTER_DOWN下线状态，SRI_MASTER_DOWN状态就是在这里设置的</strong></li>
+<li>如果返回的leader runid不是*，意味着哨兵实例对leader进行了投票，<strong>需要更新哨兵实例中的leader和leader_epoch</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 这里的privdata指向回复is-master-down-by-addr命令的那个哨兵实例</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelReceiveIsMasterDownReply</span><span class="params">(redisAsyncContext *c, <span class="keyword">void</span> *reply, <span class="keyword">void</span> *privdata)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 每个哨兵实例监控的master节点中，保存了其他监控该主节点的哨兵实例，这里的privdata就指向master节点存储的其他哨兵实例中回复了is-master-down-by-addr命令的那个哨兵实例</span></span><br><span class="line">    sentinelRedisInstance *ri = privdata;</span><br><span class="line">    instanceLink *link = c-&gt;data;</span><br><span class="line">    redisReply *r;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (!reply || !link) <span class="keyword">return</span>;</span><br><span class="line">    link-&gt;pending_commands--;</span><br><span class="line">    r = reply;</span><br><span class="line">    <span class="keyword">if</span> (r-&gt;type == REDIS_REPLY_ARRAY &amp;&amp; r-&gt;elements == <span class="number">3</span> &amp;&amp;</span><br><span class="line">        r-&gt;element[<span class="number">0</span>]-&gt;type == REDIS_REPLY_INTEGER &amp;&amp;</span><br><span class="line">        r-&gt;element[<span class="number">1</span>]-&gt;type == REDIS_REPLY_STRING &amp;&amp;</span><br><span class="line">        r-&gt;element[<span class="number">2</span>]-&gt;type == REDIS_REPLY_INTEGER)</span><br><span class="line">    &#123;</span><br><span class="line">        ri-&gt;last_master_down_reply_time = mstime();</span><br><span class="line">        <span class="comment">// 如果回复主观下线</span></span><br><span class="line">        <span class="keyword">if</span> (r-&gt;element[<span class="number">0</span>]-&gt;integer == <span class="number">1</span>) &#123;</span><br><span class="line">            <span class="comment">// 将回复命令的哨兵节点的flags状态改为SRI_MASTER_DOWN</span></span><br><span class="line">            ri-&gt;flags |= SRI_MASTER_DOWN;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            ri-&gt;flags &amp;= ~SRI_MASTER_DOWN;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 如果runid不是*</span></span><br><span class="line">        <span class="keyword">if</span> (<span class="built_in">strcmp</span>(r-&gt;element[<span class="number">1</span>]-&gt;str,<span class="string">"*"</span>)) &#123;</span><br><span class="line">            sdsfree(ri-&gt;leader);</span><br><span class="line">            <span class="keyword">if</span> ((<span class="keyword">long</span> <span class="keyword">long</span>)ri-&gt;leader_epoch != r-&gt;element[<span class="number">2</span>]-&gt;integer)</span><br><span class="line">                serverLog(LL_WARNING,</span><br><span class="line">                    <span class="string">"%s voted for %s %llu"</span>, ri-&gt;name,</span><br><span class="line">                    r-&gt;element[<span class="number">1</span>]-&gt;str,</span><br><span class="line">                    (<span class="keyword">unsigned</span> <span class="keyword">long</span> <span class="keyword">long</span>) r-&gt;element[<span class="number">2</span>]-&gt;integer);</span><br><span class="line">            <span class="comment">// 更新回复命令的哨兵存储的leader</span></span><br><span class="line">            ri-&gt;leader = sdsnew(r-&gt;element[<span class="number">1</span>]-&gt;str);</span><br><span class="line">            <span class="comment">// 更新投票轮次</span></span><br><span class="line">            ri-&gt;leader_epoch = r-&gt;element[<span class="number">2</span>]-&gt;integer;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="故障切换状态机"><a href="#故障切换状态机" class="headerlink" title="故障切换状态机"></a>故障切换状态机</h3><p>在sentinelHandleRedisInstance函数中，判断是否需要执行故障切换之后，就会调用sentinelFailoverStateMachine函数进入故障切换状态机，根据<code>failover_state</code>故障切换状态调用不同的方法，我们先关注以下两种状态：</p>
+<ol>
+<li><p><strong>SENTINEL_FAILOVER_STATE_WAIT_START</strong>：等待执行状态，表示需要执行故障切换但还未开始，在sentinelStartFailoverIfNeeded函数中可以看到如果需要执行故障切换，会调用sentinelStartFailover函数将状态置为SENTINEL_FAILOVER_STATE_WAIT_START，对应的处理函数为<strong>sentinelFailoverWaitStart</strong>，sentinelFailoverWaitStart中会判断是当前哨兵节点是否是执行故障切换的leader，如果是将状态改为<strong>SENTINEL_FAILOVER_STATE_SELECT_SLAVE。</strong></p>
+</li>
+<li><p><strong>SENTINEL_FAILOVER_STATE_SELECT_SLAVE</strong>：从SLAVE节点中选举Master节点的状态，处于这个状态意味着需要从Master的从节点中选举出可以替代Master节点的从节点，进行故障切换，对应的处理函数为<strong>sentinelFailoverSelectSlave</strong>。</p>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelFailoverStateMachine</span><span class="params">(sentinelRedisInstance *ri)</span> </span>&#123;</span><br><span class="line">    serverAssert(ri-&gt;flags &amp; SRI_MASTER);</span><br><span class="line">    <span class="comment">// 如果已经在故障切换执行中，直接返回</span></span><br><span class="line">    <span class="keyword">if</span> (!(ri-&gt;flags &amp; SRI_FAILOVER_IN_PROGRESS)) <span class="keyword">return</span>;</span><br><span class="line">    <span class="comment">// 状态机</span></span><br><span class="line">    <span class="keyword">switch</span>(ri-&gt;failover_state) &#123;</span><br><span class="line">        <span class="keyword">case</span> SENTINEL_FAILOVER_STATE_WAIT_START:<span class="comment">// 等待执行</span></span><br><span class="line">            sentinelFailoverWaitStart(ri);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> SENTINEL_FAILOVER_STATE_SELECT_SLAVE: <span class="comment">// 选举master节点</span></span><br><span class="line">            sentinelFailoverSelectSlave(ri);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> SENTINEL_FAILOVER_STATE_SEND_SLAVEOF_NOONE:</span><br><span class="line">            sentinelFailoverSendSlaveOfNoOne(ri);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> SENTINEL_FAILOVER_STATE_WAIT_PROMOTION:</span><br><span class="line">            sentinelFailoverWaitPromotion(ri);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">        <span class="keyword">case</span> SENTINEL_FAILOVER_STATE_RECONF_SLAVES:</span><br><span class="line">            sentinelFailoverReconfNextSlave(ri);</span><br><span class="line">            <span class="keyword">break</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>sentinelFailoverWaitStart</strong></p>
+<p>sentinelFailoverWaitStart函数的处理逻辑如下：</p>
+<ol>
+<li>调用sentinelGetLeader获取执行故障切换的leader</li>
+<li>对比当前哨兵是与获取到执行故障切换leader的myid是否一致，<strong>判断当前哨兵是否是执行故障切换的leader</strong></li>
+<li>如果当前哨兵不是故障切换leader, 并且不是强制执行状态SRI_FORCE_FAILOVER，当前哨兵不能执行故障切换</li>
+<li>如果当前哨兵是故障切换的leader节点，将故障切换状态改为<strong>SENTINEL_FAILOVER_STATE_SELECT_SLAVE状态，在下一次执行故障切换状态机时会从slave节点选出master节点进行故障切换</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelFailoverWaitStart</span><span class="params">(sentinelRedisInstance *ri)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">char</span> *leader;</span><br><span class="line">    <span class="keyword">int</span> isleader;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 获取执行故障切换的leader */</span></span><br><span class="line">    leader = sentinelGetLeader(ri, ri-&gt;failover_epoch);</span><br><span class="line">    <span class="comment">// leader不为空并且与当前哨兵的myid一致</span></span><br><span class="line">    isleader = leader &amp;&amp; strcasecmp(leader,sentinel.myid) == <span class="number">0</span>;</span><br><span class="line">    sdsfree(leader);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果当前哨兵不是leader, 并且不是强制执行状态SRI_FORCE_FAILOVER，当前哨兵不能执行故障切换 */</span></span><br><span class="line">    <span class="keyword">if</span> (!isleader &amp;&amp; !(ri-&gt;flags &amp; SRI_FORCE_FAILOVER)) &#123;</span><br><span class="line">        <span class="keyword">int</span> election_timeout = SENTINEL_ELECTION_TIMEOUT;</span><br><span class="line">        <span class="keyword">if</span> (election_timeout &gt; ri-&gt;failover_timeout)</span><br><span class="line">            election_timeout = ri-&gt;failover_timeout;</span><br><span class="line">        <span class="comment">/* 在超时时终止故障切换 */</span></span><br><span class="line">        <span class="keyword">if</span> (mstime() - ri-&gt;failover_start_time &gt; election_timeout) &#123;</span><br><span class="line">            sentinelEvent(LL_WARNING,<span class="string">"-failover-abort-not-elected"</span>,ri,<span class="string">"%@"</span>);</span><br><span class="line">            sentinelAbortFailover(ri);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    sentinelEvent(LL_WARNING,<span class="string">"+elected-leader"</span>,ri,<span class="string">"%@"</span>);</span><br><span class="line">    <span class="keyword">if</span> (sentinel.simfailure_flags &amp; SENTINEL_SIMFAILURE_CRASH_AFTER_ELECTION)</span><br><span class="line">        sentinelSimFailureCrash();</span><br><span class="line">    <span class="comment">// 更改为SENTINEL_FAILOVER_STATE_SELECT_SLAVE状态，在下一次执行故障切换状态机时会从slave节点选出master节点</span></span><br><span class="line">    ri-&gt;failover_state = SENTINEL_FAILOVER_STATE_SELECT_SLAVE;</span><br><span class="line">    ri-&gt;failover_state_change_time = mstime();</span><br><span class="line">    sentinelEvent(LL_WARNING,<span class="string">"+failover-state-select-slave"</span>,ri,<span class="string">"%@"</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="Leader选举"><a href="#Leader选举" class="headerlink" title="Leader选举"></a>Leader选举</h3><p><strong>sentinelGetLeader</strong></p>
+<p>sentinelGetLeader函数用于从<strong>指定的投票轮次epoch中获取Leader节点</strong>，成为一个Leader节点需要获取大多数的投票，处理逻辑如下：</p>
+<ol>
+<li>创建了一个counters字典，里面记录了每个哨兵得到的投票数，其中key为哨兵实例的id<ul>
+<li>counters的数据来源：遍历master-&gt;sentinels获取其他哨兵实例，<strong>判断哨兵实例记录的leader是否为空并且投票轮次与当前指定的epoch一致</strong>，如果一致加入counters中并将投票数增加一票</li>
+</ul>
+</li>
+<li>从counters中获取投票数最多的哨兵实例记为winner，最大投票数记为max_votes</li>
+<li>判断winner是否为空<ul>
+<li>如果不为空，在master节点中记录的leader节点和winner节点中，选出纪元（投票轮次）最新的节点记为myvote</li>
+<li>如果为空，在master节点中记录的leader节点和当前哨兵实例中，选出纪元（投票轮次）最新的节点记为myvote</li>
+</ul>
+</li>
+<li>经过上一步之后，如果myvote不为空并且leader_epoch与调用sentinelGetLeader函数时指定的epoch一致，当前哨兵给myvote增加一票，然后判断myvote得到的投票数是否大于max_votes，如果是将winner获胜者更新为myvote</li>
+<li>到这里，<strong>winner中记录了本轮投票的获胜者</strong>，也就是得到票数最多的那个，max_votes记录了获得投票数，能否成为leader还需满足以下两个条件，，<strong>保证选举出的leader得到了过半哨兵的投票</strong>：<ul>
+<li>条件一：得到的投票数max_votes大于voters_quorum，voters_quorum为哨兵实例个数的一半+1，也就是需要有过半的哨兵实例</li>
+<li>条件二：得到的投票数max_votes大于master-&gt;quorum，这个值是在 sentinel.conf 配置文件中设置的，一般设置为哨兵总数的一半+1</li>
+</ul>
+</li>
+<li>选举结束，返回winner中记录的实例id作为leader</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">char</span> *<span class="title">sentinelGetLeader</span><span class="params">(sentinelRedisInstance *master, <span class="keyword">uint64_t</span> epoch)</span> </span>&#123;</span><br><span class="line">    dict *counters;</span><br><span class="line">    dictIterator *di;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> voters = <span class="number">0</span>, voters_quorum;</span><br><span class="line">    <span class="keyword">char</span> *myvote;</span><br><span class="line">    <span class="keyword">char</span> *winner = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">uint64_t</span> leader_epoch;</span><br><span class="line">    <span class="keyword">uint64_t</span> max_votes = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    serverAssert(master-&gt;flags &amp; (SRI_O_DOWN|SRI_FAILOVER_IN_PROGRESS));</span><br><span class="line">    <span class="comment">// 创建字典</span></span><br><span class="line">    counters = dictCreate(&amp;leaderVotesDictType,<span class="literal">NULL</span>);</span><br><span class="line">    <span class="comment">// 获取所有的哨兵实例个数包含当前哨兵</span></span><br><span class="line">    voters = dictSize(master-&gt;sentinels)+<span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 遍历哨兵实例 */</span></span><br><span class="line">    di = dictGetIterator(master-&gt;sentinels);</span><br><span class="line">    <span class="keyword">while</span>((de = dictNext(di)) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="comment">// 获取每一个哨兵节点</span></span><br><span class="line">        sentinelRedisInstance *ri = dictGetVal(de);</span><br><span class="line">        <span class="comment">// 如果某个哨兵实例的leader不为空并且leader的轮次等于指定的轮次</span></span><br><span class="line">        <span class="keyword">if</span> (ri-&gt;leader != <span class="literal">NULL</span> &amp;&amp; ri-&gt;leader_epoch == sentinel.current_epoch)</span><br><span class="line">            sentinelLeaderIncr(counters,ri-&gt;leader); <span class="comment">// ri-&gt;leader的投票数加1</span></span><br><span class="line">    &#125;</span><br><span class="line">    dictReleaseIterator(di);</span><br><span class="line">    di = dictGetIterator(counters);</span><br><span class="line">    <span class="keyword">while</span>((de = dictNext(di)) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="comment">// 获取投票数</span></span><br><span class="line">        <span class="keyword">uint64_t</span> votes = dictGetUnsignedIntegerVal(de);</span><br><span class="line">        <span class="comment">// 获取投票数最多的节点的runid，记录在winner中</span></span><br><span class="line">        <span class="keyword">if</span> (votes &gt; max_votes) &#123;</span><br><span class="line">            max_votes = votes;</span><br><span class="line">            winner = dictGetKey(de);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    dictReleaseIterator(di);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果winner不为空，在master节点和winner节点中获取epoch投票轮次最新的当做当前节点的投票者*/</span></span><br><span class="line">    <span class="comment">/* 如果winner为空，在master节点和当前哨兵节点中选取epoch投票轮次最新的节点*/</span></span><br><span class="line">    <span class="keyword">if</span> (winner)</span><br><span class="line">        myvote = sentinelVoteLeader(master,epoch,winner,&amp;leader_epoch);</span><br><span class="line">    <span class="keyword">else</span></span><br><span class="line">        myvote = sentinelVoteLeader(master,epoch,sentinel.myid,&amp;leader_epoch);</span><br><span class="line">    <span class="comment">// </span></span><br><span class="line">    <span class="keyword">if</span> (myvote &amp;&amp; leader_epoch == epoch) &#123;</span><br><span class="line">        <span class="comment">// 为myvote增加一票</span></span><br><span class="line">        <span class="keyword">uint64_t</span> votes = sentinelLeaderIncr(counters,myvote);</span><br><span class="line">        <span class="comment">// 如果超过了max_votes</span></span><br><span class="line">        <span class="keyword">if</span> (votes &gt; max_votes) &#123;</span><br><span class="line">            max_votes = votes; <span class="comment">// 更新max_votes</span></span><br><span class="line">            winner = myvote; <span class="comment">// 更新winner</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// voters_quorum，为哨兵实例个数的一半+1</span></span><br><span class="line">    voters_quorum = voters/<span class="number">2</span>+<span class="number">1</span>;</span><br><span class="line">    <span class="comment">// 如果投票数量max_votes小于quorum，说明未达到过半的投票数</span></span><br><span class="line">    <span class="keyword">if</span> (winner &amp;&amp; (max_votes &lt; voters_quorum || max_votes &lt; master-&gt;quorum))</span><br><span class="line">        winner = <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">    winner = winner ? sdsnew(winner) : <span class="literal">NULL</span>;</span><br><span class="line">    sdsfree(myvote);</span><br><span class="line">    dictRelease(counters);</span><br><span class="line">    <span class="comment">// 返回获胜的节点，也就是leader节点</span></span><br><span class="line">    <span class="keyword">return</span> winner;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="投票"><a href="#投票" class="headerlink" title="投票"></a>投票</h4><p><strong>sentinelVoteLeader</strong></p>
+<p>sentinelVoteLeader函数入参中可以看到传入了master节点，和<strong>候选节点的ID<code>req_runid</code>以及候选节点的投票纪元（轮次）<code>req_epoch</code></strong>。master节点中记录了<strong>当前哨兵节点选举的执行故障切换的leader节点</strong>，在master-&gt;leader中保存。sentinelVoteLeader就用于在这两个节点中选出获胜的那个节点：</p>
+<ol>
+<li>如果候选节点的req_epoch大于当前sentinel实例的epoch，将当前哨兵实例的current_epoch置为请求轮次req_epoch</li>
+<li>如果master节点记录的leader_epoch小于候选节点的req_epoch，并且当前实例的轮次小于等于候选节点轮次，将master节点中的leader改为候选节点</li>
+<li>返回master节点中记录的leader</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">char</span> *<span class="title">sentinelVoteLeader</span><span class="params">(sentinelRedisInstance *master, <span class="keyword">uint64_t</span> req_epoch, <span class="keyword">char</span> *req_runid, <span class="keyword">uint64_t</span> *leader_epoch)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 如果请求的轮次req_epoch大于当前sentinel实例的轮次</span></span><br><span class="line">    <span class="keyword">if</span> (req_epoch &gt; sentinel.current_epoch) &#123;</span><br><span class="line">        <span class="comment">// 将哨兵实例的current_epoch置为请求轮次</span></span><br><span class="line">        sentinel.current_epoch = req_epoch;</span><br><span class="line">        sentinelFlushConfig();</span><br><span class="line">        sentinelEvent(LL_WARNING,<span class="string">"+new-epoch"</span>,master,<span class="string">"%llu"</span>,</span><br><span class="line">            (<span class="keyword">unsigned</span> <span class="keyword">long</span> <span class="keyword">long</span>) sentinel.current_epoch);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 如果master节点记录的轮次leader_epoch小于请求轮次，并且当前实例的轮次小于等于请求轮次</span></span><br><span class="line">    <span class="keyword">if</span> (master-&gt;leader_epoch &lt; req_epoch &amp;&amp; sentinel.current_epoch &lt;= req_epoch)</span><br><span class="line">    &#123;</span><br><span class="line">        sdsfree(master-&gt;leader);</span><br><span class="line">        <span class="comment">// 将leader置为传入的runid</span></span><br><span class="line">        master-&gt;leader = sdsnew(req_runid);</span><br><span class="line">        <span class="comment">// 更改master的leader_epoch</span></span><br><span class="line">        master-&gt;leader_epoch = sentinel.current_epoch;</span><br><span class="line">        sentinelFlushConfig();</span><br><span class="line">        sentinelEvent(LL_WARNING,<span class="string">"+vote-for-leader"</span>,master,<span class="string">"%s %llu"</span>,</span><br><span class="line">            master-&gt;leader, (<span class="keyword">unsigned</span> <span class="keyword">long</span> <span class="keyword">long</span>) master-&gt;leader_epoch);</span><br><span class="line">        <span class="keyword">if</span> (strcasecmp(master-&gt;leader,sentinel.myid))</span><br><span class="line">            master-&gt;failover_start_time = mstime()+rand()%SENTINEL_MAX_DESYNC;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    *leader_epoch = master-&gt;leader_epoch;</span><br><span class="line">    <span class="keyword">return</span> master-&gt;leader ? sdsnew(master-&gt;leader) : <span class="literal">NULL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>总结</strong><br><img src="/images/客观下线.png" alt=""></p>
+<p><strong>参考</strong></p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2022/05/03/【Redis】哨兵初始化和主观下线/" rel="next" title="【Redis】哨兵初始化和主观下线">
+                <i class="fa fa-chevron-left"></i> 【Redis】哨兵初始化和主观下线
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2022/05/15/【Redis】Redis Cluster初始化及PING消息的发送/" rel="prev" title="【Redis】Redis Cluster初始化及PING消息的发送">
+                【Redis】Redis Cluster初始化及PING消息的发送 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">53</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#客观下线"><span class="nav-number">1.</span> <span class="nav-text">客观下线</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#是否需要执行故障切换"><span class="nav-number">2.</span> <span class="nav-text">是否需要执行故障切换</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#sentinelStartFailover"><span class="nav-number">2.1.</span> <span class="nav-text">sentinelStartFailover</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#获取哨兵实例对主节点状态判断"><span class="nav-number">3.</span> <span class="nav-text">获取哨兵实例对主节点状态判断</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#is-master-down-by-addr命令发送"><span class="nav-number">3.1.</span> <span class="nav-text">is-master-down-by-addr命令发送</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#is-master-down-by-addr命令处理"><span class="nav-number">3.2.</span> <span class="nav-text">is-master-down-by-addr命令处理</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#is-master-down-by-addr回复处理"><span class="nav-number">3.3.</span> <span class="nav-text">is-master-down-by-addr回复处理</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#故障切换状态机"><span class="nav-number">4.</span> <span class="nav-text">故障切换状态机</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Leader选举"><span class="nav-number">5.</span> <span class="nav-text">Leader选举</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#投票"><span class="nav-number">5.1.</span> <span class="nav-text">投票</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

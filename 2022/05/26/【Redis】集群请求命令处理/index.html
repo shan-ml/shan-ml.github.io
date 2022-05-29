@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="集群请求命令处理在Redis的命令处理函数processCommand（server.c）中有对集群节点的处理，满足以下条件时进入集群节点处理逻辑中：  启用了集群模式，通过server.cluster_enabled判断 发送命令的节点不是主节点 收到的命令中包含了key参数或者命令是EXEC，EXEC命令与MULTI结合使用，用于执行事务  条件三的判断条件有些绕，!cmdHasMovable">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】集群请求命令处理">
+<meta property="og:url" content="http://yoursite.com/2022/05/26/【Redis】集群请求命令处理/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="集群请求命令处理在Redis的命令处理函数processCommand（server.c）中有对集群节点的处理，满足以下条件时进入集群节点处理逻辑中：  启用了集群模式，通过server.cluster_enabled判断 发送命令的节点不是主节点 收到的命令中包含了key参数或者命令是EXEC，EXEC命令与MULTI结合使用，用于执行事务  条件三的判断条件有些绕，!cmdHasMovable">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2022-05-29T12:26:44.979Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】集群请求命令处理">
+<meta name="twitter:description" content="集群请求命令处理在Redis的命令处理函数processCommand（server.c）中有对集群节点的处理，满足以下条件时进入集群节点处理逻辑中：  启用了集群模式，通过server.cluster_enabled判断 发送命令的节点不是主节点 收到的命令中包含了key参数或者命令是EXEC，EXEC命令与MULTI结合使用，用于执行事务  条件三的判断条件有些绕，!cmdHasMovable">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2022/05/26/【Redis】集群请求命令处理/"/>
+
+
+
+
+
+  <title>【Redis】集群请求命令处理 | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2022/05/26/【Redis】集群请求命令处理/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】集群请求命令处理</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2022-05-26T23:00:00+08:00">
+                2022-05-26
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <h2 id="集群请求命令处理"><a href="#集群请求命令处理" class="headerlink" title="集群请求命令处理"></a>集群请求命令处理</h2><p>在Redis的命令处理函数<code>processCommand</code>（server.c）中有对集群节点的处理，满足以下条件时进入集群节点处理逻辑中：</p>
+<ol>
+<li>启用了集群模式，通过<code>server.cluster_enabled</code>判断</li>
+<li>发送命令的节点不是主节点</li>
+<li>收到的命令中包含了key参数或者命令是EXEC，EXEC命令与MULTI结合使用，用于执行事务</li>
+</ol>
+<p>条件三的判断条件有些绕，<code>!cmdHasMovableKeys(c-&gt;cmd) &amp;&amp; c-&gt;cmd-&gt;firstkey == 0</code>意味着命令中没有key参数,<code>c-&gt;cmd-&gt;proc != execCommand</code>表示当前命令不是EXEC，然后对<code>(!cmdHasMovableKeys(c-&gt;cmd) &amp;&amp; c-&gt;cmd-&gt;firstkey == 0 &amp;&amp; c-&gt;cmd-&gt;proc != execCommand)</code>整体做了取反操作，那么看以下两种情况：</p>
+<ul>
+<li>如果命令中带有Key，那么<code>!cmdHasMovableKeys(c-&gt;cmd)</code>就已返回false，又因为对整体做了取反操作，所以条件成立，意味着收到命令中带有Key时需要执行重定向处理</li>
+<li>如果收到的命令是EXEC，<code>c-&gt;cmd-&gt;proc != execCommand</code>返回false，对整体取反变成true，所以条件也成立，意味着收到EXEC命令的时候执行重定向处理</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">processCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">  </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">  </span><br><span class="line">    <span class="comment">/* 如果启用了集群且发送命令的节点不是主节点，并且收到的命令中包含了key参数或者命令是EXEC时 */</span></span><br><span class="line">    <span class="keyword">if</span> (server.cluster_enabled &amp;&amp;</span><br><span class="line">        !(c-&gt;flags &amp; CLIENT_MASTER) &amp;&amp;</span><br><span class="line">        !(c-&gt;flags &amp; CLIENT_LUA &amp;&amp;</span><br><span class="line">          server.lua_caller-&gt;flags &amp; CLIENT_MASTER) &amp;&amp;</span><br><span class="line">        !(!cmdHasMovableKeys(c-&gt;cmd) &amp;&amp; c-&gt;cmd-&gt;firstkey == <span class="number">0</span> &amp;&amp;</span><br><span class="line">          c-&gt;cmd-&gt;proc != execCommand))</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="keyword">int</span> hashslot;</span><br><span class="line">        <span class="keyword">int</span> error_code;</span><br><span class="line">        <span class="comment">// 查询节点</span></span><br><span class="line">        clusterNode *n = getNodeByQuery(c,c-&gt;cmd,c-&gt;argv,c-&gt;argc,&amp;hashslot,&amp;error_code);</span><br><span class="line">        <span class="keyword">if</span> (n == <span class="literal">NULL</span> || n != server.cluster-&gt;myself) &#123;</span><br><span class="line">            <span class="keyword">if</span> (c-&gt;cmd-&gt;proc == execCommand) &#123;</span><br><span class="line">                discardTransaction(c);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                flagTransaction(c);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 重定向</span></span><br><span class="line">            clusterRedirectClient(c,n,hashslot,error_code);</span><br><span class="line">            c-&gt;cmd-&gt;rejected_calls++;</span><br><span class="line">            <span class="keyword">return</span> C_OK;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">  </span><br><span class="line">    <span class="keyword">return</span> C_OK;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">/* 如果参数中有key将会返回1 */</span></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">cmdHasMovableKeys</span><span class="params">(struct redisCommand *cmd)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> (cmd-&gt;getkeys_proc &amp;&amp; !(cmd-&gt;flags &amp; CMD_MODULE)) ||</span><br><span class="line">            cmd-&gt;flags &amp; CMD_MODULE_GETKEYS;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="MULTI命令的处理"><a href="#MULTI命令的处理" class="headerlink" title="MULTI命令的处理"></a>MULTI命令的处理</h3><p>上面说到，如果是<code>EXEC</code>命令时，也会进入到集群节点处理逻辑，<code>EXEC</code>命令一般与<code>MULTI</code>结合使用，用于执行事务。比如以下例子中，使用<code>MULTI</code>开启事务，执行对a账户增1，b账户减1的操作，可以看到返回结果为<code>QUEUED</code>，命令被缓存起来，直到执行<code>EXEC</code>命令，Redis才开始提交命令：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span>:<span class="number">6379</span>&gt; MULTI</span><br><span class="line">OK</span><br><span class="line"><span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span>:<span class="number">6379</span>&gt; INCR a:account</span><br><span class="line">QUEUED</span><br><span class="line"><span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span>:<span class="number">6379</span>&gt; DECR b:account</span><br><span class="line">QUEUED</span><br><span class="line"><span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span>:<span class="number">6379</span>&gt; EXEC</span><br><span class="line"><span class="number">1</span>) (integer) <span class="number">1</span></span><br><span class="line"><span class="number">2</span>) (integer) <span class="number">-1</span></span><br></pre></td></tr></table></figure>
+<p>由于集群也需要对<code>EXEC</code>命令处理，所以先看一下<code>MULTI</code>命令的处理逻辑，<strong><code>MULTI</code>命令对应的执行函数为<code>multiCommand</code>，可以看到它在处理的时候为客户端设置了<code>CLIENT_MULTI</code>标记</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">multiCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_MULTI) &#123;</span><br><span class="line">        addReplyError(c,<span class="string">"MULTI calls can not be nested"</span>);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 设置CLIENT_MULTI标记</span></span><br><span class="line">    c-&gt;flags |= CLIENT_MULTI;</span><br><span class="line"></span><br><span class="line">    addReply(c,shared.ok);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在Redis的命令处理函数中可以找到对<code>CLIENT_MULTI</code>的处理逻辑，<strong>如果客户端标记中有CLIENT_MULTI</strong>，并且当前命令不是EXEC、DISCARD、MULTI、WATCH和RESET，将调用<code>queueMultiCommand</code>函数，对命令进行缓存：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">processCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">  </span><br><span class="line">    <span class="comment">/* 处理MULTI命令 */</span></span><br><span class="line">    <span class="comment">/* 如果客户端标记中有CLIENT_MULTI，并且当前命令不是EXEC、DISCARD、MULTI、WATCH和RESET */</span></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_MULTI &amp;&amp;</span><br><span class="line">        c-&gt;cmd-&gt;proc != execCommand &amp;&amp; c-&gt;cmd-&gt;proc != discardCommand &amp;&amp;</span><br><span class="line">        c-&gt;cmd-&gt;proc != multiCommand &amp;&amp; c-&gt;cmd-&gt;proc != watchCommand &amp;&amp;</span><br><span class="line">        c-&gt;cmd-&gt;proc != resetCommand)</span><br><span class="line">    &#123;</span><br><span class="line">        queueMultiCommand(c); <span class="comment">// 加入到multi队列中，先将命令缓存</span></span><br><span class="line">        addReply(c,shared.queued);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        call(c,CMD_CALL_FULL);</span><br><span class="line">        c-&gt;woff = server.master_repl_offset;</span><br><span class="line">        <span class="keyword">if</span> (listLength(server.ready_keys))</span><br><span class="line">            handleClientsBlockedOnKeys();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">return</span> C_OK;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="MULTI命令结构体定义"><a href="#MULTI命令结构体定义" class="headerlink" title="MULTI命令结构体定义"></a>MULTI命令结构体定义</h4><p>在客户端结构体定义中，可以看到使用了<code>multiState</code>缓存MULTI命令：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 客户端</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">client</span> &#123;</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    multiState mstate;      <span class="comment">/* 存储MULTI/EXEC命令的结构体 */</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>multiState</strong></p>
+<p>MULTI命令对应的结构体为<code>multiState</code>，<code>multiState</code>中使用了<code>multiCmd</code>结构体来缓存具体的命令：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">multiState</span> &#123;</span></span><br><span class="line">    multiCmd *commands;     <span class="comment">/* MULTI命令数组 */</span></span><br><span class="line">    <span class="keyword">int</span> count;              <span class="comment">/* 缓存的命令个数 */</span></span><br><span class="line">    <span class="keyword">int</span> cmd_flags;          <span class="comment">/* 命令标记 */</span></span><br><span class="line">    <span class="keyword">int</span> cmd_inv_flags;      <span class="comment">/* 与cmd_flags一致 */</span></span><br><span class="line">&#125; multiState;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* multi命令 */</span></span><br><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">multiCmd</span> &#123;</span></span><br><span class="line">    robj **argv;</span><br><span class="line">    <span class="keyword">int</span> argc;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">redisCommand</span> *<span class="title">cmd</span>;</span> <span class="comment">/* 命令 */</span></span><br><span class="line">&#125; multiCmd;</span><br></pre></td></tr></table></figure>
+<h4 id="MULTI命令的缓存"><a href="#MULTI命令的缓存" class="headerlink" title="MULTI命令的缓存"></a>MULTI命令的缓存</h4><p><strong>queueMultiCommand</strong></p>
+<p>对MULTI命令缓存的处理在queueMultiCommand函数中，它在multi.c文件中定义：</p>
+<ol>
+<li>将<code>multiCmd</code>加入到缓存数组<code>c-&gt;mstate.commands</code>中，对命令进行缓存</li>
+<li>将当前命令的内容设置到<code>multiCmd</code>中</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* 将当前命令加入到MULTI命令中 */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">queueMultiCommand</span><span class="params">(client *c)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// MULTI命令</span></span><br><span class="line">    multiCmd *mc;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_DIRTY_EXEC)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    c-&gt;mstate.commands = zrealloc(c-&gt;mstate.commands,</span><br><span class="line">            <span class="keyword">sizeof</span>(multiCmd)*(c-&gt;mstate.count+<span class="number">1</span>));</span><br><span class="line">    <span class="comment">// 到加入MULTI数组中</span></span><br><span class="line">    mc = c-&gt;mstate.commands+c-&gt;mstate.count;</span><br><span class="line">    <span class="comment">// 设置命令</span></span><br><span class="line">    mc-&gt;cmd = c-&gt;cmd;</span><br><span class="line">    <span class="comment">// 设置参数</span></span><br><span class="line">    mc-&gt;argc = c-&gt;argc;</span><br><span class="line">    mc-&gt;argv = zmalloc(<span class="keyword">sizeof</span>(robj*)*c-&gt;argc);</span><br><span class="line">    <span class="built_in">memcpy</span>(mc-&gt;argv,c-&gt;argv,<span class="keyword">sizeof</span>(robj*)*c-&gt;argc);</span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; c-&gt;argc; j++)</span><br><span class="line">        incrRefCount(mc-&gt;argv[j]);</span><br><span class="line">    <span class="comment">// 缓存的命令数加1</span></span><br><span class="line">    c-&gt;mstate.count++;</span><br><span class="line">    <span class="comment">// 设置客户端标记</span></span><br><span class="line">    c-&gt;mstate.cmd_flags |= c-&gt;cmd-&gt;flags;</span><br><span class="line">    c-&gt;mstate.cmd_inv_flags |= ~c-&gt;cmd-&gt;flags;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="查询节点"><a href="#查询节点" class="headerlink" title="查询节点"></a>查询节点</h3><p><strong>getNodeByQuery</strong></p>
+<p><strong>getNodeByQuery函数用于根据KEY查询数据所在的节点</strong>，处理逻辑如下：</p>
+<ol>
+<li><p>如果是EXEC命令，从客户端获取multiState，multiState中缓存了MULTI命令，如果不是MULTI命令，而是单个命令，同样使用multiState来存放命令，之后就可以统一使用multiState来获取请求中的命令</p>
+</li>
+<li><p>根据命令的个数进行遍历，处理每一个命令</p>
+<p>（1）从命令中获取key的个数，处理每一个key</p>
+<p>（2）查询每一个key所在的slot</p>
+<p>（3）如果处理的是第一个key，根据所属slot获取所在的节点，记为<code>n</code>，有以下三种情况：</p>
+<p>​          情况一：未获取到节点（有可能节点已下线但是还未更新状态），记录错误信息为<code>CLUSTER_REDIR_DOWN_UNBOUND</code>，表示key未绑定到slot，返回NULL</p>
+<p>​          情况二：<strong>可以查找到节点，并且是当前节点自己，但是key所属slot正在做数据迁出操作（从当前节点迁出）</strong>，此时将<code>migrating_slot</code>置为1</p>
+<p>​          情况三：<strong>可以查找到节点，并且不是当前节点自己，但是key所属slot正在迁入到当前节点</strong>，此时将<code>importing_slot</code>置为1</p>
+<p>（4）如果处理的不是第一个key，判断当前key所属的slot是否与第一个key的slot一致：</p>
+<p>​          情况一：如果不一致，表示不同的key所属的slot不同，将error_code置为<code>CLUSTER_REDIR_CROSS_SLOT</code>，返回NULL</p>
+<p>​          情况二：如果一致，将<code>multiple_keys</code>置为1，表示请求中有多个KEY，做一个标记</p>
+<p>（5）根据<code>migrating_slot</code>和<code>importing_slot</code>的值判断key所属slot是否正在迁出或者迁入，迁出意味着key对应的数据正在从当前节点迁出到其他节点，迁入意味着key对应的数据正在迁入到当前节点，由于数据未迁移完毕，所以这两种情况都需要<strong>检查key是否在当前节点的数据库中，如果不在意味着当前节点没有该key的数据</strong>，需要记录缺失的KEY的数量，<code>missing_keys</code>增1</p>
+</li>
+<li><p>根据第二步查询后的结果，进行如下处理：</p>
+<ul>
+<li><p>未查找到节点，也就是<code>n</code>为空，返回当前节点自己</p>
+</li>
+<li><p>当前节点不处于正常状态（CLUSTER_OK）</p>
+<p>（1）如果未开启allow_reads_when_down（在节点下线时允许读），error_code置为<code>CLUSTER_REDIR_DOWN_STATE</code>，并返回NULL</p>
+<p>（2）当前命令中有写标记，error_code置为<code>CLUSTER_REDIR_DOWN_RO_STATE</code>，并返回NULL</p>
+<p>（3）非以上两种情况，<strong>表示开启了allow_reads_when_down，并且是读操作，所以当前节点依旧可以处理请求</strong>，继续往下执行</p>
+</li>
+<li><p>如果数据正在迁出或者正在迁入，并且当前命令是MIGRATE数据迁移的命令，返回当前节点 </p>
+</li>
+<li><p>如果key所在slot数据正在从当前节点迁出，并且当前节点数据库中有缺失的key，error_code置为<code>CLUSTER_REDIR_ASK</code>并返回迁出到的那个节点</p>
+</li>
+<li><p>如果key所在slot正在迁入到当前节点，并且当前命令是ASK ，此时<strong>如果请求中有多个KEY并且当前节点存在缺失的KEY，表示有些key不在当前节点</strong>，error_code置为<code>CLUSTER_REDIR_UNSTABLE</code>返回NULL，<strong>否则返回当前节点即可</strong></p>
+</li>
+<li><p>如果客户端有只读标记、 当前命令不是写命令、<strong>当前节点是从节点并且它的主节点是根据key所属slot查找到的节点</strong>，返回当前节点，因为从节点数据是从master节点同步的，而master节点正是要查找的节点，从节点也可以处理读请求</p>
+</li>
+<li><p><strong>如果查询到的节点不是当前节点，将error_code置为<code>CLUSTER_REDIR_MOVED</code>，表示数据已经移动到其他节点，此时返回key所属slot对应的实际节点</strong></p>
+</li>
+</ul>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">clusterNode *<span class="title">getNodeByQuery</span><span class="params">(client *c, struct redisCommand *cmd, robj **argv, <span class="keyword">int</span> argc, <span class="keyword">int</span> *hashslot, <span class="keyword">int</span> *error_code)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 集群节点</span></span><br><span class="line">    clusterNode *n = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="comment">// 记录命令中的第一个KEY</span></span><br><span class="line">    robj *firstkey = <span class="literal">NULL</span>;</span><br><span class="line">    <span class="keyword">int</span> multiple_keys = <span class="number">0</span>;</span><br><span class="line">    multiState *ms, _ms;</span><br><span class="line">    multiCmd mc;</span><br><span class="line">    <span class="keyword">int</span> i, slot = <span class="number">0</span>, migrating_slot = <span class="number">0</span>, importing_slot = <span class="number">0</span>, missing_keys = <span class="number">0</span>;</span><br><span class="line">  </span><br><span class="line">    <span class="keyword">if</span> (server.cluster_module_flags &amp; CLUSTER_MODULE_FLAG_NO_REDIRECTION)</span><br><span class="line">        <span class="keyword">return</span> myself;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (error_code) *error_code = CLUSTER_REDIR_NONE;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果是EXEC命令 */</span></span><br><span class="line">    <span class="keyword">if</span> (cmd-&gt;proc == execCommand) &#123;</span><br><span class="line">        <span class="comment">/* 校验是否有CLIENT_MULTI标记 */</span></span><br><span class="line">        <span class="keyword">if</span> (!(c-&gt;flags &amp; CLIENT_MULTI)) <span class="keyword">return</span> myself;</span><br><span class="line">        <span class="comment">// 获取multiState</span></span><br><span class="line">        ms = &amp;c-&gt;mstate;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">/* 如果不是MULTI命令，而是单个命令，同样使用multiState来存储命令 */</span></span><br><span class="line">        ms = &amp;_ms;</span><br><span class="line">        _ms.commands = &amp;mc;</span><br><span class="line">        _ms.count = <span class="number">1</span>; <span class="comment">// 命令个数设置为1</span></span><br><span class="line">        mc.argv = argv;</span><br><span class="line">        mc.argc = argc;</span><br><span class="line">        mc.cmd = cmd; <span class="comment">// 设置命令</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 根据命令的个数进行遍历，处理每一个命令 */</span></span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; ms-&gt;count; i++) &#123;</span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">redisCommand</span> *<span class="title">mcmd</span>;</span></span><br><span class="line">        robj **margv;</span><br><span class="line">        <span class="keyword">int</span> margc, *keyindex, numkeys, j;</span><br><span class="line"></span><br><span class="line">        mcmd = ms-&gt;commands[i].cmd; <span class="comment">// 获取命令</span></span><br><span class="line">        margc = ms-&gt;commands[i].argc;</span><br><span class="line">        margv = ms-&gt;commands[i].argv;</span><br><span class="line"></span><br><span class="line">        getKeysResult result = GETKEYS_RESULT_INIT;</span><br><span class="line">        <span class="comment">// 从命令中获取key的个数</span></span><br><span class="line">        numkeys = getKeysFromCommand(mcmd,margv,margc,&amp;result);</span><br><span class="line">        keyindex = result.keys;</span><br><span class="line">        <span class="comment">// 遍历每一个key</span></span><br><span class="line">        <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; numkeys; j++) &#123;</span><br><span class="line">            <span class="comment">// 获取key</span></span><br><span class="line">            robj *thiskey = margv[keyindex[j]];</span><br><span class="line">            <span class="comment">// 查询key所在的slot</span></span><br><span class="line">            <span class="keyword">int</span> thisslot = keyHashSlot((<span class="keyword">char</span>*)thiskey-&gt;ptr,</span><br><span class="line">                                       sdslen(thiskey-&gt;ptr));</span><br><span class="line">            <span class="comment">// 如果是第一个key</span></span><br><span class="line">            <span class="keyword">if</span> (firstkey == <span class="literal">NULL</span>) &#123;</span><br><span class="line">                <span class="comment">/* 将第一个key记录在firstkey */</span></span><br><span class="line">                firstkey = thiskey;</span><br><span class="line">                <span class="comment">// 记录slot</span></span><br><span class="line">                slot = thisslot;</span><br><span class="line">                <span class="comment">// 根据slot获取集群节点</span></span><br><span class="line">                n = server.cluster-&gt;slots[slot];</span><br><span class="line"></span><br><span class="line">                <span class="comment">/* 如果未获取到节点（有可能节点已下线），记录错误信息，返回NULL */</span></span><br><span class="line">                <span class="keyword">if</span> (n == <span class="literal">NULL</span>) &#123;</span><br><span class="line">                    getKeysFreeResult(&amp;result);</span><br><span class="line">                    <span class="keyword">if</span> (error_code)</span><br><span class="line">                        *error_code = CLUSTER_REDIR_DOWN_UNBOUND;</span><br><span class="line">                    <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="comment">/* 如果根据slot查到的节点是当前节点自己，并且slot正在做数据迁出操作 */</span></span><br><span class="line">                <span class="keyword">if</span> (n == myself &amp;&amp;</span><br><span class="line">                    server.cluster-&gt;migrating_slots_to[slot] != <span class="literal">NULL</span>)</span><br><span class="line">                &#123;</span><br><span class="line">                    migrating_slot = <span class="number">1</span>; <span class="comment">// migrating_slot置为1，标记正在做数据迁出操作</span></span><br><span class="line">                &#125; <span class="keyword">else</span> <span class="keyword">if</span> (server.cluster-&gt;importing_slots_from[slot] != <span class="literal">NULL</span>) &#123;</span><br><span class="line">                    <span class="comment">// 如果key所属的slot正在做数据迁入操作，importing_slot置为1</span></span><br><span class="line">                    importing_slot = <span class="number">1</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123; </span><br><span class="line">                <span class="comment">/* 如果不是第一个key*/</span></span><br><span class="line">                <span class="keyword">if</span> (!equalStringObjects(firstkey,thiskey)) &#123;</span><br><span class="line">                    <span class="comment">// 如果和第一个key的slot不一致，error_code置为CLUSTER_REDIR_CROSS_SLOT</span></span><br><span class="line">                    <span class="keyword">if</span> (slot != thisslot) &#123;</span><br><span class="line">                    </span><br><span class="line">                        getKeysFreeResult(&amp;result);</span><br><span class="line">                        <span class="keyword">if</span> (error_code)</span><br><span class="line">                            *error_code = CLUSTER_REDIR_CROSS_SLOT;    <span class="comment">/* 不同的key所属不同的slot */</span></span><br><span class="line">                        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">                    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                        <span class="comment">/* 标记请求中有多个KEY */</span></span><br><span class="line">                        multiple_keys = <span class="number">1</span>;</span><br><span class="line">                    &#125;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line"></span><br><span class="line">            <span class="comment">/* 如果slot正在迁入或者迁出，检查key是否在当前节点的db中，如果不在记录缺失的KEY的数量 */</span></span><br><span class="line">            <span class="keyword">if</span> ((migrating_slot || importing_slot) &amp;&amp;</span><br><span class="line">                lookupKeyRead(&amp;server.db[<span class="number">0</span>],thiskey) == <span class="literal">NULL</span>)</span><br><span class="line">            &#123;</span><br><span class="line">                missing_keys++;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        getKeysFreeResult(&amp;result);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果未查到，返回当前节点自己 */</span></span><br><span class="line">    <span class="keyword">if</span> (n == <span class="literal">NULL</span>) <span class="keyword">return</span> myself;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果当前节点的状态不是CLUSTER_OK状态，节点可能处于异常状态，只有在开启了allow_reads_when_down（在节点下线时允许读）并且当前命令是读操作才继续往下处理，否则记录错误信息返回NULL */</span></span><br><span class="line">    <span class="keyword">if</span> (server.cluster-&gt;state != CLUSTER_OK) &#123;</span><br><span class="line">         <span class="comment">// 如果设置了节点下线时不允许读</span></span><br><span class="line">        <span class="keyword">if</span> (!server.cluster_allow_reads_when_down) &#123;</span><br><span class="line">            <span class="comment">/* 记录错误信息，返回NULL */</span></span><br><span class="line">            <span class="keyword">if</span> (error_code) *error_code = CLUSTER_REDIR_DOWN_STATE;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (cmd-&gt;flags &amp; CMD_WRITE) &#123; <span class="comment">// 如果命令中有写标记</span></span><br><span class="line">            <span class="comment">/* The cluster is configured to allow read only commands */</span></span><br><span class="line">            <span class="keyword">if</span> (error_code) *error_code = CLUSTER_REDIR_DOWN_RO_STATE;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">/* Fall through and allow the command to be executed:</span></span><br><span class="line"><span class="comment">             * this happens when server.cluster_allow_reads_when_down is</span></span><br><span class="line"><span class="comment">             * true and the command is not a write command */</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 更新hashslot */</span></span><br><span class="line">    <span class="keyword">if</span> (hashslot) *hashslot = slot;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果数据正在迁出或者正在迁入，并且当前命令是MIGRATE数据迁移的命令，返回当前节点 */</span></span><br><span class="line">    <span class="keyword">if</span> ((migrating_slot || importing_slot) &amp;&amp; cmd-&gt;proc == migrateCommand)</span><br><span class="line">        <span class="keyword">return</span> myself;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果key所在slot数据正在迁出，并且当前节点数据库中有缺失的key*/</span></span><br><span class="line">    <span class="keyword">if</span> (migrating_slot &amp;&amp; missing_keys) &#123;</span><br><span class="line">        <span class="comment">// error_code设置为CLUSTER_REDIR_ASK</span></span><br><span class="line">        <span class="keyword">if</span> (error_code) *error_code = CLUSTER_REDIR_ASK;</span><br><span class="line">        <span class="comment">// 返回迁出到的那个节点</span></span><br><span class="line">        <span class="keyword">return</span> server.cluster-&gt;migrating_slots_to[slot];</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果key所在slot正在做数据迁入，并且当前命令是ASK */</span></span><br><span class="line">    <span class="keyword">if</span> (importing_slot &amp;&amp;</span><br><span class="line">        (c-&gt;flags &amp; CLIENT_ASKING || cmd-&gt;flags &amp; CMD_ASKING))</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 如果请求中有多个KEY并且有当前节点数据库中有缺失的key</span></span><br><span class="line">        <span class="keyword">if</span> (multiple_keys &amp;&amp; missing_keys) &#123;</span><br><span class="line">            <span class="keyword">if</span> (error_code) *error_code = CLUSTER_REDIR_UNSTABLE;</span><br><span class="line">            <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="comment">// 返回当前节点</span></span><br><span class="line">            <span class="keyword">return</span> myself;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 是否是写命令 */</span></span><br><span class="line">    <span class="keyword">int</span> is_write_command = (c-&gt;cmd-&gt;flags &amp; CMD_WRITE) ||</span><br><span class="line">                           (c-&gt;cmd-&gt;proc == execCommand &amp;&amp; (c-&gt;mstate.cmd_flags &amp; CMD_WRITE));</span><br><span class="line">    <span class="comment">// 如果客户端有只读标记、当前命令不是写命令，当前节点是从节点并且它的主节点是根据key所属slot查找到节点</span></span><br><span class="line">    <span class="keyword">if</span> (c-&gt;flags &amp; CLIENT_READONLY &amp;&amp;</span><br><span class="line">        !is_write_command &amp;&amp;</span><br><span class="line">        nodeIsSlave(myself) &amp;&amp;</span><br><span class="line">        myself-&gt;slaveof == n)</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 返回当前节点即可</span></span><br><span class="line">        <span class="keyword">return</span> myself;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 如果查询到的节点不是当前节点，将error_code置为CLUSTER_REDIR_MOVED，返回key所属slot对应的实际节点 */</span></span><br><span class="line">    <span class="keyword">if</span> (n != myself &amp;&amp; error_code) *error_code = CLUSTER_REDIR_MOVED;</span><br><span class="line">    <span class="keyword">return</span> n;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="根据Key从DB中查询Value"><a href="#根据Key从DB中查询Value" class="headerlink" title="根据Key从DB中查询Value"></a>根据Key从DB中查询Value</h4><p><strong>redisDb</strong></p>
+<p>Redis数据库对应的结构体定义为redisDb，里面有个字典类型的对象，存储键值对数据：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">redisDb</span> &#123;</span></span><br><span class="line">    dict *dict;                 <span class="comment">/* 存储的键值对数据 */</span></span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125; redisDb;</span><br></pre></td></tr></table></figure>
+<p><strong>lookupKeyRead</strong></p>
+<p>lookupKeyRead函数用于从redisDb中根据key查找数据，最终是调用lookupKey函数完成的，根据Key从字典中查找并返回value：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">robj *<span class="title">lookupKeyRead</span><span class="params">(redisDb *db, robj *key)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 调用lookupKeyReadWithFlags查找</span></span><br><span class="line">    <span class="keyword">return</span> lookupKeyReadWithFlags(db,key,LOOKUP_NONE);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">robj *<span class="title">lookupKeyWriteWithFlags</span><span class="params">(redisDb *db, robj *key, <span class="keyword">int</span> flags)</span> </span>&#123;</span><br><span class="line">    expireIfNeeded(db,key);</span><br><span class="line">    <span class="comment">// 调用lookupKey函数查找</span></span><br><span class="line">    <span class="keyword">return</span> lookupKey(db,key,flags);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function">robj *<span class="title">lookupKey</span><span class="params">(redisDb *db, robj *key, <span class="keyword">int</span> flags)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 根据KEY从字典中进行查找</span></span><br><span class="line">    dictEntry *de = dictFind(db-&gt;dict,key-&gt;ptr);</span><br><span class="line">    <span class="comment">// 如果不为空</span></span><br><span class="line">    <span class="keyword">if</span> (de) &#123;</span><br><span class="line">        robj *val = dictGetVal(de);</span><br><span class="line">        <span class="keyword">if</span> (!hasActiveChildProcess() &amp;&amp; !(flags &amp; LOOKUP_NOTOUCH))&#123;</span><br><span class="line">            <span class="keyword">if</span> (server.maxmemory_policy &amp; MAXMEMORY_FLAG_LFU) &#123;</span><br><span class="line">                updateLFU(val);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                val-&gt;lru = LRU_CLOCK();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 返回value</span></span><br><span class="line">        <span class="keyword">return</span> val;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="集群重定向"><a href="#集群重定向" class="headerlink" title="集群重定向"></a>集群重定向</h3><p><strong>clusterRedirectClient</strong></p>
+<p>clusterRedirectClient用于集群重定向处理，在getNodeByQuery函数中，根据查询节点的情况对error_code设置了不同的值，在clusterRedirectClient函数中可以看到对error_code的判断，根据error_code的不同，向客户端响应不同的内容：</p>
+<ol>
+<li>如果error_code是<code>CLUSTER_REDIR_CROSS_SLOT</code>，表示请求中有多个KEY，但是KEY所属slot不在同一个slot中</li>
+<li>如果error_code是<code>CLUSTER_REDIR_UNSTABLE</code>，表示请求中有多个KEY并且在一个slot，但是数据可能正在迁入或迁出的过程中，节点中有缺失的KEY，slot处于一个不稳定的状态</li>
+<li>如果error_code是<code>CLUSTER_REDIR_DOWN_STATE</code>，表示节点处于下线状态</li>
+<li>如果error_code是<code>CLUSTER_REDIR_DOWN_RO_STATE</code>，表示节点处于下线状态，只接收读命令</li>
+<li>如果error_code是<code>CLUSTER_REDIR_DOWN_UNBOUND</code>，标识key未绑定到节点，也就是根据key所属slot未查询到节点</li>
+<li>如果error_code是<code>CLUSTER_REDIR_MOVED</code>或者<code>CLUSTER_REDIR_ASK</code>：<ul>
+<li><strong><code>CLUSTER_REDIR_MOVED</code>表示key所属slot已从当前节点迁出，此时向客户端响应MOVED命令并将迁出后slot以及所在节点ip和端口返回</strong></li>
+<li><strong><code>CLUSTER_REDIR_ASK</code>表示key所属slot正在从当前节点迁出的过程中，请求中的key有可能一部分还未迁出，一部分已经迁出完毕，此时向客户端返回ASK命令，并将slot以及迁出到的目标节点的ip和端口返回</strong></li>
+</ul>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">clusterRedirectClient</span><span class="params">(client *c, clusterNode *n, <span class="keyword">int</span> hashslot, <span class="keyword">int</span> error_code)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span> (error_code == CLUSTER_REDIR_CROSS_SLOT) &#123;</span><br><span class="line">        <span class="comment">// 如果是CLUSTER_REDIR_CROSS_SLOT，向客户端回复key不在同一个slot中</span></span><br><span class="line">        addReplyError(c,<span class="string">"-CROSSSLOT Keys in request don't hash to the same slot"</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (error_code == CLUSTER_REDIR_UNSTABLE) &#123;</span><br><span class="line">        <span class="comment">/* 请求中有多个key并且在一个slot，但是数据可能正在迁入或迁出的过程中,slot并不稳定 */</span></span><br><span class="line">        addReplyError(c,<span class="string">"-TRYAGAIN Multiple keys request during rehashing of slot"</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (error_code == CLUSTER_REDIR_DOWN_STATE) &#123;</span><br><span class="line">        <span class="comment">// 节点处于下线状态</span></span><br><span class="line">        addReplyError(c,<span class="string">"-CLUSTERDOWN The cluster is down"</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (error_code == CLUSTER_REDIR_DOWN_RO_STATE) &#123;</span><br><span class="line">        <span class="comment">// 节点已经下线只接收读命令</span></span><br><span class="line">        addReplyError(c,<span class="string">"-CLUSTERDOWN The cluster is down and only accepts read commands"</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (error_code == CLUSTER_REDIR_DOWN_UNBOUND) &#123;</span><br><span class="line">        <span class="comment">// 如果是CLUSTER_REDIR_DOWN_UNBOUND，表示根据key所属slot未查询到节点</span></span><br><span class="line">        addReplyError(c,<span class="string">"-CLUSTERDOWN Hash slot not served"</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> <span class="keyword">if</span> (error_code == CLUSTER_REDIR_MOVED ||</span><br><span class="line">               error_code == CLUSTER_REDIR_ASK)</span><br><span class="line">    &#123; </span><br><span class="line">        <span class="comment">/* 如果是MOVED或者ASK，需要进行请求重定向处理，向客户端返回ASK或者MOVED命令,并将目标节点的ip和端口返回 */</span></span><br><span class="line">        <span class="keyword">int</span> use_pport = (server.tls_cluster &amp;&amp;</span><br><span class="line">                         c-&gt;conn &amp;&amp; connGetType(c-&gt;conn) != CONN_TYPE_TLS);</span><br><span class="line">        <span class="keyword">int</span> port = use_pport &amp;&amp; n-&gt;pport ? n-&gt;pport : n-&gt;port;</span><br><span class="line">        <span class="comment">// 返回响应，包括ASK或者MOVED命令、slot信息、目标节点的ip端口</span></span><br><span class="line">        addReplyErrorSds(c,sdscatprintf(sdsempty(),</span><br><span class="line">            <span class="string">"-%s %d %s:%d"</span>,</span><br><span class="line">            (error_code == CLUSTER_REDIR_ASK) ? <span class="string">"ASK"</span> : <span class="string">"MOVED"</span>,</span><br><span class="line">            hashslot, n-&gt;ip, port));</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        serverPanic(<span class="string">"getNodeByQuery() unknown error."</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>参考</strong></p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a><br><a href="https://my.oschina.net/u/3474060/blog/952612" target="_blank" rel="noopener">zhaiguanjie-Redis源码剖析</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2022/05/26/【Redis】集群数据迁移/" rel="next" title="【Redis】集群数据迁移">
+                <i class="fa fa-chevron-left"></i> 【Redis】集群数据迁移
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">53</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#集群请求命令处理"><span class="nav-number">1.</span> <span class="nav-text">集群请求命令处理</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#MULTI命令的处理"><span class="nav-number">1.1.</span> <span class="nav-text">MULTI命令的处理</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#MULTI命令结构体定义"><span class="nav-number">1.1.1.</span> <span class="nav-text">MULTI命令结构体定义</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#MULTI命令的缓存"><span class="nav-number">1.1.2.</span> <span class="nav-text">MULTI命令的缓存</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#查询节点"><span class="nav-number">1.2.</span> <span class="nav-text">查询节点</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#根据Key从DB中查询Value"><span class="nav-number">1.2.1.</span> <span class="nav-text">根据Key从DB中查询Value</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#集群重定向"><span class="nav-number">1.3.</span> <span class="nav-text">集群重定向</span></a></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>

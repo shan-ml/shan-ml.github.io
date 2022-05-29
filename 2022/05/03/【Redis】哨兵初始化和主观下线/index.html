@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+
+
+
+  
+
+
+<html class="theme-next muse use-motion" lang="">
+<head>
+  <meta charset="UTF-8"/>
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1"/>
+<meta name="theme-color" content="#222">
+
+
+
+
+
+
+
+
+
+<meta http-equiv="Cache-Control" content="no-transform" />
+<meta http-equiv="Cache-Control" content="no-siteapp" />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+  <link href="/lib/fancybox/source/jquery.fancybox.css?v=2.1.5" rel="stylesheet" type="text/css" />
+
+
+
+
+
+
+
+<link href="/lib/font-awesome/css/font-awesome.min.css?v=4.6.2" rel="stylesheet" type="text/css" />
+
+<link href="/css/main.css?v=5.1.4" rel="stylesheet" type="text/css" />
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png?v=5.1.4">
+
+
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png?v=5.1.4">
+
+
+  <link rel="mask-icon" href="/images/logo.svg?v=5.1.4" color="#222">
+
+
+
+
+
+  <meta name="keywords" content="Redis," />
+
+
+
+
+
+
+
+
+
+
+<meta name="description" content="在的redis启动函数main（server.c文件）中，对哨兵模式进行了检查，如果是哨兵模式，将调用initSentinelConfig和initSentinel进行初始化，initServer函数中会注册哨兵的时间事件，最后调用sentinelIsRunning运行哨兵实例， 12345678910111213141516171819202122232425262728293031323334">
+<meta name="keywords" content="Redis">
+<meta property="og:type" content="article">
+<meta property="og:title" content="【Redis】哨兵初始化和主观下线">
+<meta property="og:url" content="http://yoursite.com/2022/05/03/【Redis】哨兵初始化和主观下线/index.html">
+<meta property="og:site_name" content="SHAN">
+<meta property="og:description" content="在的redis启动函数main（server.c文件）中，对哨兵模式进行了检查，如果是哨兵模式，将调用initSentinelConfig和initSentinel进行初始化，initServer函数中会注册哨兵的时间事件，最后调用sentinelIsRunning运行哨兵实例， 12345678910111213141516171819202122232425262728293031323334">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2022-05-03T08:43:04.612Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="【Redis】哨兵初始化和主观下线">
+<meta name="twitter:description" content="在的redis启动函数main（server.c文件）中，对哨兵模式进行了检查，如果是哨兵模式，将调用initSentinelConfig和initSentinel进行初始化，initServer函数中会注册哨兵的时间事件，最后调用sentinelIsRunning运行哨兵实例， 12345678910111213141516171819202122232425262728293031323334">
+
+
+
+<script type="text/javascript" id="hexo.configurations">
+  var NexT = window.NexT || {};
+  var CONFIG = {
+    root: '/',
+    scheme: 'Muse',
+    version: '5.1.4',
+    sidebar: {"position":"left","display":"post","offset":12,"b2t":false,"scrollpercent":false,"onmobile":false},
+    fancybox: true,
+    tabs: true,
+    motion: {"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}},
+    duoshuo: {
+      userId: '0',
+      author: 'Author'
+    },
+    algolia: {
+      applicationID: '',
+      apiKey: '',
+      indexName: '',
+      hits: {"per_page":10},
+      labels: {"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}
+    }
+  };
+</script>
+
+
+
+  <link rel="canonical" href="http://yoursite.com/2022/05/03/【Redis】哨兵初始化和主观下线/"/>
+
+
+
+
+
+  <title>【Redis】哨兵初始化和主观下线 | SHAN</title>
+  
+
+
+
+
+
+
+
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage" lang="default">
+
+  
+  
+    
+  
+
+  <div class="container sidebar-position-left page-post-detail">
+    <div class="headband"></div>
+
+    <header id="header" class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-wrapper">
+  <div class="site-meta ">
+    
+
+    <div class="custom-logo-site-title">
+      <a href="/"  class="brand" rel="start">
+        <span class="logo-line-before"><i></i></span>
+        <span class="site-title">SHAN</span>
+        <span class="logo-line-after"><i></i></span>
+      </a>
+    </div>
+      
+        <p class="site-subtitle"></p>
+      
+  </div>
+
+  <div class="site-nav-toggle">
+    <button>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+      <span class="btn-bar"></span>
+    </button>
+  </div>
+</div>
+
+<nav class="site-nav">
+  
+
+  
+    <ul id="menu" class="menu">
+      
+        
+        <li class="menu-item menu-item-home">
+          <a href="/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-home"></i> <br />
+            
+            Home
+          </a>
+        </li>
+      
+        
+        <li class="menu-item menu-item-archives">
+          <a href="/archives/" rel="section">
+            
+              <i class="menu-item-icon fa fa-fw fa-archive"></i> <br />
+            
+            Archives
+          </a>
+        </li>
+      
+
+      
+    </ul>
+  
+
+  
+</nav>
+
+
+
+ </div>
+    </header>
+
+    <main id="main" class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          <div id="content" class="content">
+            
+
+  <div id="posts" class="posts-expand">
+    
+
+  
+
+  
+  
+  
+
+  <article class="post post-type-normal" itemscope itemtype="http://schema.org/Article">
+  
+  
+  
+  <div class="post-block">
+    <link itemprop="mainEntityOfPage" href="http://yoursite.com/2022/05/03/【Redis】哨兵初始化和主观下线/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="name" content="shan">
+      <meta itemprop="description" content="">
+      <meta itemprop="image" content="/images/avatar.gif">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="SHAN">
+    </span>
+
+    
+      <header class="post-header">
+
+        
+        
+          <h1 class="post-title" itemprop="name headline">【Redis】哨兵初始化和主观下线</h1>
+        
+
+        <div class="post-meta">
+          <span class="post-time">
+            
+              <span class="post-meta-item-icon">
+                <i class="fa fa-calendar-o"></i>
+              </span>
+              
+                <span class="post-meta-item-text">Posted on</span>
+              
+              <time title="Post created" itemprop="dateCreated datePublished" datetime="2022-05-03T17:00:00+08:00">
+                2022-05-03
+              </time>
+            
+
+            
+
+            
+          </span>
+
+          
+
+          
+            
+          
+
+          
+          
+
+          
+
+          
+
+          
+
+        </div>
+      </header>
+    
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+      
+
+      
+        <p>在的redis启动函数main（server.c文件）中，对哨兵模式进行了检查，如果是哨兵模式，将调用initSentinelConfig和initSentinel进行初始化，initServer函数中会注册哨兵的时间事件，最后调用sentinelIsRunning运行哨兵实例，</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> **argv)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 检查哨兵模式</span></span><br><span class="line">    server.sentinel_mode = checkForSentinelMode(argc,argv);</span><br><span class="line">    initServerConfig();</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (server.sentinel_mode) &#123;</span><br><span class="line">        initSentinelConfig(); <span class="comment">// 初始化哨兵配置</span></span><br><span class="line">        initSentinel(); <span class="comment">// 初始化哨兵</span></span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    <span class="comment">// 初始化服务</span></span><br><span class="line">    initServer();</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    <span class="keyword">if</span> (!server.sentinel_mode) &#123; <span class="comment">// 非哨兵模式</span></span><br><span class="line">        <span class="comment">// 省略...</span></span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        ACLLoadUsersAtStartup();</span><br><span class="line">        InitServerLast();</span><br><span class="line">        <span class="comment">// 运行哨兵实例</span></span><br><span class="line">        sentinelIsRunning();</span><br><span class="line">        <span class="keyword">if</span> (server.supervised_mode == SUPERVISED_SYSTEMD) &#123;</span><br><span class="line">            redisCommunicateSystemd(<span class="string">"STATUS=Ready to accept connections\n"</span>);</span><br><span class="line">            redisCommunicateSystemd(<span class="string">"READY=1\n"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">  </span><br><span class="line">    aeMain(server.el);</span><br><span class="line">    aeDeleteEventLoop(server.el);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="哨兵初始化"><a href="#哨兵初始化" class="headerlink" title="哨兵初始化"></a>哨兵初始化</h2><h3 id="哨兵模式校验"><a href="#哨兵模式校验" class="headerlink" title="哨兵模式校验"></a>哨兵模式校验</h3><p><strong>checkForSentinelMode</strong></p>
+<p>checkForSentinelMode函数在server.c文件中，用于校验是否是哨兵模式，可以看到有两种方式校验哨兵模式：</p>
+<ol>
+<li>直接执行<code>redis-sentinel</code>命令</li>
+<li>执行<code>redis-server</code>命令，命令参数中带有<code>–sentinel</code>参数</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">checkForSentinelMode</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> **argv)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line">    <span class="comment">// 直接执行redis-sentinel</span></span><br><span class="line">    <span class="keyword">if</span> (<span class="built_in">strstr</span>(argv[<span class="number">0</span>],<span class="string">"redis-sentinel"</span>) != <span class="literal">NULL</span>) <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">1</span>; j &lt; argc; j++)</span><br><span class="line">        <span class="keyword">if</span> (!<span class="built_in">strcmp</span>(argv[j],<span class="string">"--sentinel"</span>)) <span class="keyword">return</span> <span class="number">1</span>; <span class="comment">// 执行的命令参数中，是否有–sentinel</span></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="初始化配置项"><a href="#初始化配置项" class="headerlink" title="初始化配置项"></a>初始化配置项</h3><p><strong>initSentinelConfig</strong></p>
+<p>initSentinelConfig函数在sentinel.c文件中，用于初始化哨兵配置：</p>
+<ol>
+<li>将哨兵实例的端口号设置为<code>REDIS_SENTINEL_PORT</code>，默认值26379</li>
+<li>将<code>protected_mode</code>设置为0，表示允许外部链接哨兵实例，而不是只能通过127.0.0.1本地连接 server</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> REDIS_SENTINEL_PORT 26379</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">initSentinelConfig</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    server.port = REDIS_SENTINEL_PORT; <span class="comment">/* 设置默认端口 */</span></span><br><span class="line">    server.protected_mode = <span class="number">0</span>; <span class="comment">/* 允许外部链接哨兵实例 */</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>initSentinel</strong></p>
+<p>在看initSentinel函数之前，首先看下Redis中哨兵sentinel对象对应的结构体sentinelState：</p>
+<ul>
+<li>current_epoch：<strong>当前纪元，投票选举Leader时使用，纪元可以理解为投票的轮次</strong></li>
+<li>masters：<strong>监控的master节点哈希表</strong>，Key为master节点名称， value为master节点对应sentinelRedisInstance实例的指针 </li>
+</ul>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">sentinelState</span> &#123;</span></span><br><span class="line">    <span class="keyword">char</span> myid[CONFIG_RUN_ID_SIZE+<span class="number">1</span>]; <span class="comment">/* sentinel ID */</span></span><br><span class="line">    <span class="keyword">uint64_t</span> current_epoch;         <span class="comment">/* 当前的纪元（投票轮次）*/</span></span><br><span class="line">    dict *masters;      <span class="comment">/* 监控的master节点哈希表，Key为master节点名称, value为master节点对应的实例对象的指针 */</span></span><br><span class="line">    <span class="keyword">int</span> tilt;           <span class="comment">/*  TILT模式 */</span></span><br><span class="line">    <span class="keyword">int</span> running_scripts;    </span><br><span class="line">    <span class="keyword">mstime_t</span> tilt_start_time;  </span><br><span class="line">    <span class="keyword">mstime_t</span> previous_time;         </span><br><span class="line">    <span class="built_in">list</span> *scripts_queue;           </span><br><span class="line">    <span class="keyword">char</span> *announce_ip;  </span><br><span class="line">    <span class="keyword">int</span> announce_port;  </span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">long</span> simfailure_flags; </span><br><span class="line">    <span class="keyword">int</span> deny_scripts_reconfig; </span><br><span class="line">    <span class="keyword">char</span> *sentinel_auth_pass;    </span><br><span class="line">    <span class="keyword">char</span> *sentinel_auth_user;   </span><br><span class="line">    <span class="keyword">int</span> resolve_hostnames;       </span><br><span class="line">    <span class="keyword">int</span> announce_hostnames;      </span><br><span class="line">&#125; sentinel;</span><br></pre></td></tr></table></figure>
+<p><strong>sentinelRedisInstance</strong>是一个通用的结构体，在sentinel.c文件中定义，它既可以表示主节点，也可以表示从节点或者其他哨兵实例，从中选选出了一些主要的内容：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span>  &#123;</span></span><br><span class="line">    <span class="keyword">int</span> flags;      <span class="comment">/* 一些状态标识 */</span></span><br><span class="line">    <span class="keyword">char</span> *name;     <span class="comment">/* Master name from the point of view of this sentinel. */</span></span><br><span class="line">    <span class="keyword">char</span> *runid;    <span class="comment">/* 实例的运行ID */</span></span><br><span class="line">    <span class="keyword">uint64_t</span> config_epoch;  <span class="comment">/* 配置的纪元. */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> s_down_since_time; <span class="comment">/* 主观下线时长 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> o_down_since_time; <span class="comment">/* 客观下线时长 */</span></span><br><span class="line">    dict *sentinels;    <span class="comment">/* 监控同一主节点的其他哨兵实例 */</span></span><br><span class="line">    dict *slaves;       <span class="comment">/* slave节点（从节点） */</span></span><br><span class="line">    <span class="comment">/* 故障切换 */</span></span><br><span class="line">    <span class="keyword">char</span> *leader;       <span class="comment">/* 如果是master节点，保存了需要执行故障切换的哨兵leader的runid,如果是一个哨兵，保存的是这个哨兵投票选举的leader*/</span></span><br><span class="line">    <span class="keyword">uint64_t</span> leader_epoch; <span class="comment">/* leader纪元 */</span></span><br><span class="line">    <span class="keyword">uint64_t</span> failover_epoch; </span><br><span class="line">    <span class="keyword">int</span> failover_state; <span class="comment">/* 故障切换状态 */</span></span><br><span class="line">  </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125; sentinelRedisInstance;</span><br></pre></td></tr></table></figure>
+<p>initSentinel函数同样在sentinel.c文件中，用于初始化哨兵，由于哨兵实例与普通Redis实例不一样，所以需要替换Redis中的命令，添加哨兵实例命令，哨兵实例使用的命令在sentinelcmds中定义：</p>
+<ol>
+<li>将server.commands和server.orig_commands保存的常规Redis命令清除</li>
+<li>遍历sentinelcmds哨兵实例专用命令，将命令添加到server.commands和server.orig_commands中</li>
+<li>初始化sentinel实例中的数据项</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 哨兵实例下的命令</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">redisCommand</span> <span class="title">sentinelcmds</span>[] = &#123;</span></span><br><span class="line">    &#123;<span class="string">"ping"</span>,pingCommand,<span class="number">1</span>,<span class="string">"fast @connection"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"sentinel"</span>,sentinelCommand,<span class="number">-2</span>,<span class="string">"admin"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"subscribe"</span>,subscribeCommand,<span class="number">-2</span>,<span class="string">"pub-sub"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"unsubscribe"</span>,unsubscribeCommand,<span class="number">-1</span>,<span class="string">"pub-sub"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"psubscribe"</span>,psubscribeCommand,<span class="number">-2</span>,<span class="string">"pub-sub"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"punsubscribe"</span>,punsubscribeCommand,<span class="number">-1</span>,<span class="string">"pub-sub"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"publish"</span>,sentinelPublishCommand,<span class="number">3</span>,<span class="string">"pub-sub fast"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"info"</span>,sentinelInfoCommand,<span class="number">-1</span>,<span class="string">"random @dangerous"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"role"</span>,sentinelRoleCommand,<span class="number">1</span>,<span class="string">"fast read-only @dangerous"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"client"</span>,clientCommand,<span class="number">-2</span>,<span class="string">"admin random @connection"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"shutdown"</span>,shutdownCommand,<span class="number">-1</span>,<span class="string">"admin"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"auth"</span>,authCommand,<span class="number">-2</span>,<span class="string">"no-auth fast @connection"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"hello"</span>,helloCommand,<span class="number">-1</span>,<span class="string">"no-auth fast @connection"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"acl"</span>,aclCommand,<span class="number">-2</span>,<span class="string">"admin"</span>,<span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;,</span><br><span class="line">    &#123;<span class="string">"command"</span>,commandCommand,<span class="number">-1</span>, <span class="string">"random @connection"</span>, <span class="number">0</span>,<span class="literal">NULL</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>,<span class="number">0</span>&#125;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 初始化哨兵 */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">initSentinel</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">unsigned</span> <span class="keyword">int</span> j;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 将常规的Redis命令移除，增加哨兵实例专用的命令 */</span></span><br><span class="line">    dictEmpty(server.commands,<span class="literal">NULL</span>);</span><br><span class="line">    dictEmpty(server.orig_commands,<span class="literal">NULL</span>);</span><br><span class="line">    ACLClearCommandID();</span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; <span class="keyword">sizeof</span>(sentinelcmds)/<span class="keyword">sizeof</span>(sentinelcmds[<span class="number">0</span>]); j++) &#123;</span><br><span class="line">        <span class="keyword">int</span> retval;</span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">redisCommand</span> *<span class="title">cmd</span> = <span class="title">sentinelcmds</span>+<span class="title">j</span>;</span></span><br><span class="line">        cmd-&gt;id = ACLGetCommandID(cmd-&gt;name);</span><br><span class="line">        <span class="comment">// 添加到server.commands</span></span><br><span class="line">        retval = dictAdd(server.commands, sdsnew(cmd-&gt;name), cmd);</span><br><span class="line">        serverAssert(retval == DICT_OK);</span><br><span class="line">        <span class="comment">// 添加到server.orig_commands</span></span><br><span class="line">        retval = dictAdd(server.orig_commands, sdsnew(cmd-&gt;name), cmd);</span><br><span class="line">        serverAssert(retval == DICT_OK);</span><br><span class="line">        <span class="keyword">if</span> (populateCommandTableParseFlags(cmd,cmd-&gt;sflags) == C_ERR)</span><br><span class="line">            serverPanic(<span class="string">"Unsupported command flag"</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 初始化其他数据项 */</span></span><br><span class="line">    <span class="comment">// current_epoch初始化为0</span></span><br><span class="line">    sentinel.current_epoch = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 监控的master节点实例对象</span></span><br><span class="line">    sentinel.masters = dictCreate(&amp;instancesDictType,<span class="literal">NULL</span>);</span><br><span class="line">    sentinel.tilt = <span class="number">0</span>;</span><br><span class="line">    sentinel.tilt_start_time = <span class="number">0</span>;</span><br><span class="line">    sentinel.previous_time = mstime();</span><br><span class="line">    sentinel.running_scripts = <span class="number">0</span>;</span><br><span class="line">    sentinel.scripts_queue = listCreate();</span><br><span class="line">    sentinel.announce_ip = <span class="literal">NULL</span>;</span><br><span class="line">    sentinel.announce_port = <span class="number">0</span>;</span><br><span class="line">    sentinel.simfailure_flags = SENTINEL_SIMFAILURE_NONE;</span><br><span class="line">    sentinel.deny_scripts_reconfig = SENTINEL_DEFAULT_DENY_SCRIPTS_RECONFIG;</span><br><span class="line">    sentinel.sentinel_auth_pass = <span class="literal">NULL</span>;</span><br><span class="line">    sentinel.sentinel_auth_user = <span class="literal">NULL</span>;</span><br><span class="line">    sentinel.resolve_hostnames = SENTINEL_DEFAULT_RESOLVE_HOSTNAMES;</span><br><span class="line">    sentinel.announce_hostnames = SENTINEL_DEFAULT_ANNOUNCE_HOSTNAMES;</span><br><span class="line">    <span class="built_in">memset</span>(sentinel.myid,<span class="number">0</span>,<span class="keyword">sizeof</span>(sentinel.myid));</span><br><span class="line">    server.sentinel_config = <span class="literal">NULL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="启动哨兵实例"><a href="#启动哨兵实例" class="headerlink" title="启动哨兵实例"></a>启动哨兵实例</h2><p><strong>sentinelIsRunning</strong></p>
+<p>sentinelIsRunning函数在sentinel.c文件中，用于启动哨兵实例：</p>
+<ol>
+<li>校验是否设置了哨兵实例的ID，如果未设置，将随机生成一个ID</li>
+<li>调用sentinelGenerateInitialMonitorEvents向监控的主节点发送+monitor事件</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelIsRunning</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">int</span> j;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 校验myid是否为0 */</span></span><br><span class="line">    <span class="keyword">for</span> (j = <span class="number">0</span>; j &lt; CONFIG_RUN_ID_SIZE; j++)</span><br><span class="line">        <span class="keyword">if</span> (sentinel.myid[j] != <span class="number">0</span>) <span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (j == CONFIG_RUN_ID_SIZE) &#123;</span><br><span class="line">        <span class="comment">/* 随机生成ID */</span></span><br><span class="line">        getRandomHexChars(sentinel.myid,CONFIG_RUN_ID_SIZE);</span><br><span class="line">        sentinelFlushConfig();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    serverLog(LL_WARNING,<span class="string">"Sentinel ID is %s"</span>, sentinel.myid);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 向监控的主节点发送+monitor事件 */</span></span><br><span class="line">    sentinelGenerateInitialMonitorEvents();</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* 向监控的主节点发布事件 */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelGenerateInitialMonitorEvents</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    dictIterator *di;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    <span class="comment">// 获取监控的主节点</span></span><br><span class="line">    di = dictGetIterator(sentinel.masters);</span><br><span class="line">    <span class="keyword">while</span>((de = dictNext(di)) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        sentinelRedisInstance *ri = dictGetVal(de);</span><br><span class="line">        <span class="comment">// 向主节点发送监控事件</span></span><br><span class="line">        sentinelEvent(LL_WARNING,<span class="string">"+monitor"</span>,ri,<span class="string">"%@ quorum %d"</span>,ri-&gt;quorum);</span><br><span class="line">    &#125;</span><br><span class="line">    dictReleaseIterator(di);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="哨兵时间事件"><a href="#哨兵时间事件" class="headerlink" title="哨兵时间事件"></a>哨兵时间事件</h2><p>在initServer函数中，调用aeCreateTimeEvent注册了时间事件，周期性的执行serverCron函数，serverCron函数中通过server.sentinel_mode判断是否是哨兵模式，如果是哨兵模式，调用sentinelTimer执行哨兵事件：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">initServer</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    <span class="keyword">if</span> (aeCreateTimeEvent(server.el, <span class="number">1</span>, serverCron, <span class="literal">NULL</span>, <span class="literal">NULL</span>) == AE_ERR) &#123;</span><br><span class="line">        serverPanic(<span class="string">"Can't create event loop timers."</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">serverCron</span><span class="params">(struct aeEventLoop *eventLoop, <span class="keyword">long</span> <span class="keyword">long</span> id, <span class="keyword">void</span> *clientData)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 如果是哨兵模式，调用sentinelTimer执行哨兵事件</span></span><br><span class="line">    <span class="keyword">if</span> (server.sentinel_mode) sentinelTimer();</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>sentinelTimer</strong></p>
+<p>sentinelTimer在sentinel.c文件中，sentinelTimer函数会周期性的执行：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelTimer</span><span class="params">(<span class="keyword">void</span>)</span> </span>&#123;</span><br><span class="line">    sentinelCheckTiltCondition();</span><br><span class="line">    <span class="comment">// 处理RedisInstances，传入的参数是当前哨兵实例维护的主节点的哈希表，里面记录当前节点监听的主节点</span></span><br><span class="line">    sentinelHandleDictOfRedisInstances(sentinel.masters);</span><br><span class="line">    sentinelRunPendingScripts();</span><br><span class="line">    sentinelCollectTerminatedScripts();</span><br><span class="line">    sentinelKillTimedoutScripts();</span><br><span class="line">    <span class="comment">// 调整sentinelTimer的执行频率</span></span><br><span class="line">    server.hz = CONFIG_DEFAULT_HZ + rand() % CONFIG_DEFAULT_HZ;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>sentinelHandleDictOfRedisInstances</strong></p>
+<p>sentinelHandleDictOfRedisInstances函数中会对传入的当前哨兵实例监听的主节点哈希表进行遍历：</p>
+<ol>
+<li>获取哈希表中的每一个节点，节点类型是sentinelRedisInstance</li>
+<li><strong>调用sentinelHandleRedisInstance检测哨兵监听节点的状态</strong></li>
+<li>如果sentinelHandleRedisInstance是主节点，由于主节点里面保存了监听该主节点的其他哨兵实例以及从节点，所以递归调用sentinelHandleDictOfRedisInstances对其他的节点进行检测</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/* sentinelHandleDictOfRedisInstances */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelHandleDictOfRedisInstances</span><span class="params">(dict *instances)</span> </span>&#123;</span><br><span class="line">    dictIterator *di;</span><br><span class="line">    dictEntry *de;</span><br><span class="line">    sentinelRedisInstance *switch_to_promoted = <span class="literal">NULL</span>;</span><br><span class="line">    di = dictGetIterator(instances);</span><br><span class="line">    <span class="comment">// 遍历所有的sentinelRedisInstance实例</span></span><br><span class="line">    <span class="keyword">while</span>((de = dictNext(di)) != <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="comment">// 获取每一个sentinelRedisInstance</span></span><br><span class="line">        sentinelRedisInstance *ri = dictGetVal(de);</span><br><span class="line">        <span class="comment">// 调用sentinelHandleRedisInstance检测哨兵监听节点的状态</span></span><br><span class="line">        sentinelHandleRedisInstance(ri);</span><br><span class="line">        <span class="comment">// 如果是sentinelRedisInstance是主节点，主节点里面保存了监听该主节点的其他哨兵实例以及从节点</span></span><br><span class="line">        <span class="keyword">if</span> (ri-&gt;flags &amp; SRI_MASTER) &#123;</span><br><span class="line">            <span class="comment">// 递归调用，处理从节点</span></span><br><span class="line">            sentinelHandleDictOfRedisInstances(ri-&gt;slaves);</span><br><span class="line">            <span class="comment">// 递归调用，处理其他哨兵实例</span></span><br><span class="line">            sentinelHandleDictOfRedisInstances(ri-&gt;sentinels);</span><br><span class="line">            <span class="keyword">if</span> (ri-&gt;failover_state == SENTINEL_FAILOVER_STATE_UPDATE_CONFIG) &#123;</span><br><span class="line">                switch_to_promoted = ri;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (switch_to_promoted)</span><br><span class="line">        sentinelFailoverSwitchToPromotedSlave(switch_to_promoted);</span><br><span class="line">    dictReleaseIterator(di);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="检测哨兵监听的节点状态"><a href="#检测哨兵监听的节点状态" class="headerlink" title="检测哨兵监听的节点状态"></a>检测哨兵监听的节点状态</h3><p><strong>sentinelHandleRedisInstance</strong></p>
+<p>sentinelHandleRedisInstance函数对传入的sentinelRedisInstance实例，进行状态检测，主要处理逻辑如下：</p>
+<ol>
+<li>调用sentinelReconnectInstance对实例的连接状态进行判断，如果<strong>连接中断尝试重新与实例建立连接 </strong></li>
+<li>调用sentinelSendPeriodicCommands<strong>向实例发送PING INFO等命令</strong></li>
+<li>sentinelCheckSubjectivelyDown判断<strong>实例是否主观下线</strong></li>
+<li>如果实例是master节点，调用sentinelCheckObjectivelyDown判断<strong>是否客观下线、是否需要执行故障切换</strong></li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">/* Perform scheduled operations for the specified Redis instance. */</span></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelHandleRedisInstance</span><span class="params">(sentinelRedisInstance *ri)</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 如果监听的节点连接中断，尝试重新建立连接 </span></span><br><span class="line">    sentinelReconnectInstance(ri);</span><br><span class="line">    <span class="comment">// 发送PING INFO等命令</span></span><br><span class="line">    sentinelSendPeriodicCommands(ri);</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 检查是否是TILT模式</span></span><br><span class="line">    <span class="keyword">if</span> (sentinel.tilt) &#123;</span><br><span class="line">        <span class="keyword">if</span> (mstime()-sentinel.tilt_start_time &lt; SENTINEL_TILT_PERIOD) <span class="keyword">return</span>;</span><br><span class="line">        sentinel.tilt = <span class="number">0</span>;</span><br><span class="line">        sentinelEvent(LL_WARNING,<span class="string">"-tilt"</span>,<span class="literal">NULL</span>,<span class="string">"#tilt mode exited"</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 判断主观下线</span></span><br><span class="line">    sentinelCheckSubjectivelyDown(ri);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* Masters and slaves */</span></span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;flags &amp; (SRI_MASTER|SRI_SLAVE)) &#123;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 如果是master节点</span></span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;flags &amp; SRI_MASTER) &#123;</span><br><span class="line">        <span class="comment">// 判断客观下线</span></span><br><span class="line">        sentinelCheckObjectivelyDown(ri);</span><br><span class="line">        <span class="comment">// 是否需要启动故障切换</span></span><br><span class="line">        <span class="keyword">if</span> (sentinelStartFailoverIfNeeded(ri))</span><br><span class="line">            sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_ASK_FORCED);</span><br><span class="line">        <span class="comment">// 执行故障切换</span></span><br><span class="line">        sentinelFailoverStateMachine(ri);</span><br><span class="line">        <span class="comment">// 获取其他哨兵实例对master节点状态的判断</span></span><br><span class="line">        sentinelAskMasterStateToOtherSentinels(ri,SENTINEL_NO_FLAGS);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="重新连接"><a href="#重新连接" class="headerlink" title="重新连接"></a>重新连接</h4><p><strong>sentinelReconnectInstance</strong></p>
+<p>sentinelReconnectInstance函数用于检测实例的连接状态，如果中断进行重连，主要处理逻辑如下：</p>
+<ol>
+<li><p>检测连接是否中断，如果未中断直接返回</p>
+</li>
+<li><p>检查端口是否为0,0被认为是不合法的端口</p>
+</li>
+<li><p>从sentinelRedisInstance实例中获取instanceLink，instanceLink的定义在sentinel.c文件中，<strong>里面记录了哨兵和主节点的两个连接，分别为用于发送命令的连接cc和用于发送Pub/Sub消息的连接pc</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">typedef</span> <span class="class"><span class="keyword">struct</span> <span class="title">instanceLink</span> &#123;</span></span><br><span class="line">    <span class="keyword">int</span> refcount;         </span><br><span class="line">    <span class="keyword">int</span> disconnected;      </span><br><span class="line">    <span class="keyword">int</span> pending_commands;  </span><br><span class="line">    redisAsyncContext *cc; <span class="comment">/* 用于发送命令的连接 */</span></span><br><span class="line">    redisAsyncContext *pc; <span class="comment">/* 用于发送Pub/Sub消息的连接 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> cc_conn_time; <span class="comment">/* cc 连接时间 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> pc_conn_time; <span class="comment">/* pc 连接时间 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> pc_last_activity; </span><br><span class="line">    <span class="keyword">mstime_t</span> last_avail_time; <span class="comment">/* 上一次收到实例回复PING命令（需要被认定为合法）的时间 */</span>  </span><br><span class="line">    <span class="keyword">mstime_t</span> act_ping_time; <span class="comment">/* 当收到PONG消息的时候会设置为0，在下次发送PING命令时设置为当前时间 */</span>  </span><br><span class="line">    <span class="keyword">mstime_t</span> last_ping_time;  <span class="comment">/* 上次发送PING命令时间，在出现故障时可以通过判断发送时间避免多次发送PING命令 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> last_pong_time;  <span class="comment">/* 上次收到PONG消息的时间 */</span></span><br><span class="line">    <span class="keyword">mstime_t</span> last_reconn_time;  <span class="comment">/* 上次执行重连的时间 */</span></span><br><span class="line">&#125; instanceLink;</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>校验距离上次重连时间是否小于PING的检测周期SENTINEL_PING_PERIOD，如果小于说明距离上次重连时间过近，直接返回即可</p>
+<p>SENTINEL_PING_PERIOD在server.c中定义，默认1000毫秒</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">define</span> SENTINEL_PING_PERIOD 1000</span></span><br></pre></td></tr></table></figure>
+</li>
+<li><p>对用于发送命令的连接判断，如果连接为NULL，调用redisAsyncConnectBind函数进行重连</p>
+</li>
+<li><p>对用于处理发送 Pub/Sub 消息的连接进行判断，如果连接为NULL，调用redisAsyncConnectBind函数进行重连</p>
+</li>
+</ol>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelReconnectInstance</span><span class="params">(sentinelRedisInstance *ri)</span> </span>&#123;</span><br><span class="line">    <span class="comment">// 检查连接是否中断</span></span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;link-&gt;disconnected == <span class="number">0</span>) <span class="keyword">return</span>;</span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;addr-&gt;port == <span class="number">0</span>) <span class="keyword">return</span>; <span class="comment">/* 检查端口是否为0,0被认为是不合法的端口 */</span></span><br><span class="line">    <span class="comment">// 获取instanceLink</span></span><br><span class="line">    instanceLink *link = ri-&gt;link;</span><br><span class="line">    <span class="keyword">mstime_t</span> now = mstime();</span><br><span class="line">    <span class="comment">// 校验距离上次重连时间是否小于哨兵PING的周期设置</span></span><br><span class="line">    <span class="keyword">if</span> (now - ri-&gt;link-&gt;last_reconn_time &lt; SENTINEL_PING_PERIOD) <span class="keyword">return</span>;</span><br><span class="line">    ri-&gt;link-&gt;last_reconn_time = now;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* 处理用于发送命令的连接 */</span></span><br><span class="line">    <span class="keyword">if</span> (link-&gt;cc == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        <span class="comment">// 进行连接</span></span><br><span class="line">        link-&gt;cc = redisAsyncConnectBind(ri-&gt;addr-&gt;ip,ri-&gt;addr-&gt;port,NET_FIRST_BIND_ADDR);</span><br><span class="line">        <span class="keyword">if</span> (link-&gt;cc &amp;&amp; !link-&gt;cc-&gt;err) anetCloexec(link-&gt;cc-&gt;c.fd);</span><br><span class="line">        <span class="comment">// 省略...</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">/* 处理用于发送 Pub/Sub 消息的连接 */</span></span><br><span class="line">    <span class="keyword">if</span> ((ri-&gt;flags &amp; (SRI_MASTER|SRI_SLAVE)) &amp;&amp; link-&gt;pc == <span class="literal">NULL</span>) &#123;</span><br><span class="line">        link-&gt;pc = redisAsyncConnectBind(ri-&gt;addr-&gt;ip,ri-&gt;addr-&gt;port,NET_FIRST_BIND_ADDR);</span><br><span class="line">        <span class="keyword">if</span> (link-&gt;pc &amp;&amp; !link-&gt;pc-&gt;err) anetCloexec(link-&gt;pc-&gt;c.fd);</span><br><span class="line">        <span class="comment">// 省略...</span></span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">if</span> (link-&gt;cc &amp;&amp; (ri-&gt;flags &amp; SRI_SENTINEL || link-&gt;pc))</span><br><span class="line">        link-&gt;disconnected = <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="发送命令"><a href="#发送命令" class="headerlink" title="发送命令"></a>发送命令</h4><p><strong>sentinelSendPeriodicCommands</strong></p>
+<p>sentinelSendPeriodicCommands用于向实例发送命令：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelSendPeriodicCommands</span><span class="params">(sentinelRedisInstance *ri)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">mstime_t</span> now = mstime();</span><br><span class="line">    <span class="keyword">mstime_t</span> info_period, ping_period;</span><br><span class="line">    <span class="keyword">int</span> retval;</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 省略...</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">/* 向主节点和从节点发送INFO命令 */</span></span><br><span class="line">    <span class="keyword">if</span> ((ri-&gt;flags &amp; SRI_SENTINEL) == <span class="number">0</span> &amp;&amp;</span><br><span class="line">        (ri-&gt;info_refresh == <span class="number">0</span> ||</span><br><span class="line">        (now - ri-&gt;info_refresh) &gt; info_period))</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">// 发送INFO命令</span></span><br><span class="line">        retval = redisAsyncCommand(ri-&gt;link-&gt;cc,</span><br><span class="line">            sentinelInfoReplyCallback, ri, <span class="string">"%s"</span>,</span><br><span class="line">            sentinelInstanceMapCommand(ri,<span class="string">"INFO"</span>));</span><br><span class="line">        <span class="keyword">if</span> (retval == C_OK) ri-&gt;link-&gt;pending_commands++;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">if</span> ((now - ri-&gt;link-&gt;last_pong_time) &gt; ping_period &amp;&amp;</span><br><span class="line">               (now - ri-&gt;link-&gt;last_ping_time) &gt; ping_period/<span class="number">2</span>) &#123;</span><br><span class="line">        <span class="comment">// 向实例发送PING命令</span></span><br><span class="line">        sentinelSendPing(ri);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* PUBLISH hello messages to all the three kinds of instances. */</span></span><br><span class="line">    <span class="keyword">if</span> ((now - ri-&gt;last_pub_time) &gt; SENTINEL_PUBLISH_PERIOD) &#123;</span><br><span class="line">        <span class="comment">// 发送PUBLISH命令</span></span><br><span class="line">        sentinelSendHello(ri);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="主观下线"><a href="#主观下线" class="headerlink" title="主观下线"></a>主观下线</h4><p><strong>sentinelCheckSubjectivelyDown</strong></p>
+<p>sentinelCheckSubjectivelyDown函数用于判断是否主观下线。</p>
+<p><strong>标记主观下线的两个条件</strong></p>
+<ul>
+<li><strong>距离上次发送PING命令的时长超过了down_after_period的值</strong>，down_after_period的值在sentinel.conf 配置文件中配置，对应的配置项为down-after-milliseconds ，默认值30s</li>
+<li>哨兵认为实例是主节点（ri-&gt;flags &amp; SRI_MASTE），但是实例向哨兵返回的角色是从节点（ri-&gt;role_reported == SRI_SLAVE） 并且当前时间-实例报告消息的时间role_reported_time大于down_after_period加上SENTINEL_INFO_PERIOD乘以2的时间 ，SENTINEL_INFO_PERIOD 是发送INFO命令的时间间隔，也就是说<strong>实例上次成功向哨兵报告角色的时间，已经超过了限定时间（down_after_period加上SENTINEL_INFO_PERIOD*2）</strong></li>
+</ul>
+<p><strong>满足以上两个条件之一哨兵将会把sentinelRedisInstance判断为主观下线，flag标记会添加SRI_S_DOWN状态。</strong></p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">sentinelCheckSubjectivelyDown</span><span class="params">(sentinelRedisInstance *ri)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">mstime_t</span> elapsed = <span class="number">0</span>;</span><br><span class="line">    <span class="comment">// 如果act_ping_time不为0</span></span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;link-&gt;act_ping_time)</span><br><span class="line">        elapsed = mstime() - ri-&gt;link-&gt;act_ping_time; <span class="comment">// 计算距离上次发送PING命令的间隔时间</span></span><br><span class="line">    <span class="keyword">else</span> <span class="keyword">if</span> (ri-&gt;link-&gt;disconnected) <span class="comment">// 如果连接断开</span></span><br><span class="line">        elapsed = mstime() - ri-&gt;link-&gt;last_avail_time; <span class="comment">// 计算距离最近一次收到PING命令回复的间隔时间</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;link-&gt;cc &amp;&amp;</span><br><span class="line">        (mstime() - ri-&gt;link-&gt;cc_conn_time) &gt;</span><br><span class="line">        SENTINEL_MIN_LINK_RECONNECT_PERIOD &amp;&amp;</span><br><span class="line">        ri-&gt;link-&gt;act_ping_time != <span class="number">0</span> &amp;&amp; </span><br><span class="line">        (mstime() - ri-&gt;link-&gt;act_ping_time) &gt; (ri-&gt;down_after_period/<span class="number">2</span>) &amp;&amp;</span><br><span class="line">        (mstime() - ri-&gt;link-&gt;last_pong_time) &gt; (ri-&gt;down_after_period/<span class="number">2</span>))</span><br><span class="line">    &#123;</span><br><span class="line">        instanceLinkCloseConnection(ri-&gt;link,ri-&gt;link-&gt;cc);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (ri-&gt;link-&gt;pc &amp;&amp;</span><br><span class="line">        (mstime() - ri-&gt;link-&gt;pc_conn_time) &gt;</span><br><span class="line">         SENTINEL_MIN_LINK_RECONNECT_PERIOD &amp;&amp;</span><br><span class="line">        (mstime() - ri-&gt;link-&gt;pc_last_activity) &gt; (SENTINEL_PUBLISH_PERIOD*<span class="number">3</span>))</span><br><span class="line">    &#123;</span><br><span class="line">        instanceLinkCloseConnection(ri-&gt;link,ri-&gt;link-&gt;pc);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* </span></span><br><span class="line"><span class="comment">     * 标记主观下线的两个条件（或的关系）</span></span><br><span class="line"><span class="comment">     * 1) 距离上次发送PING命令的时长超过了down_after_period</span></span><br><span class="line"><span class="comment">     * 2) 哨兵认为实例是主节点（ri-&gt;flags &amp; SRI_MASTE），但是实例向哨兵返回的角色是从节点（ri-&gt;role_reported == SRI_SLAVE） 并且当前时间-实例返回消息的时间大于down_after_period加上SENTINEL_INFO_PERIOD*2的时间 */</span></span><br><span class="line">    <span class="keyword">if</span> (elapsed &gt; ri-&gt;down_after_period ||</span><br><span class="line">        (ri-&gt;flags &amp; SRI_MASTER &amp;&amp;</span><br><span class="line">         ri-&gt;role_reported == SRI_SLAVE &amp;&amp;</span><br><span class="line">         mstime() - ri-&gt;role_reported_time &gt;</span><br><span class="line">          (ri-&gt;down_after_period+SENTINEL_INFO_PERIOD*<span class="number">2</span>)))</span><br><span class="line">    &#123;</span><br><span class="line">        <span class="comment">/* 主观下线 */</span></span><br><span class="line">        <span class="keyword">if</span> ((ri-&gt;flags &amp; SRI_S_DOWN) == <span class="number">0</span>) &#123;</span><br><span class="line">            <span class="comment">// 发送+sdown事件</span></span><br><span class="line">            sentinelEvent(LL_WARNING,<span class="string">"+sdown"</span>,ri,<span class="string">"%@"</span>);</span><br><span class="line">            ri-&gt;s_down_since_time = mstime();</span><br><span class="line">            ri-&gt;flags |= SRI_S_DOWN; <span class="comment">// 更改状态</span></span><br><span class="line">        &#125;</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">/* Is subjectively up */</span></span><br><span class="line">        <span class="keyword">if</span> (ri-&gt;flags &amp; SRI_S_DOWN) &#123;</span><br><span class="line">            sentinelEvent(LL_WARNING,<span class="string">"-sdown"</span>,ri,<span class="string">"%@"</span>);</span><br><span class="line">            ri-&gt;flags &amp;= ~(SRI_S_DOWN|SRI_SCRIPT_KILL_SENT);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="客观下线"><a href="#客观下线" class="headerlink" title="客观下线"></a>客观下线</h4><p>如果是主节点，将会调用sentinelCheckObjectivelyDown函数判断客观下线，之后调用sentinelStartFailoverIfNeeded判断是否需要执行故障切换。</p>
+<p><strong>总结</strong></p>
+<p><a href="/images/主观下线总结.png"></a></p>
+<p><strong>参考</strong></p>
+<p><a href="https://time.geekbang.org/column/intro/430" target="_blank" rel="noopener">极客时间  -  Redis源码剖析与实战(蒋德钧)</a></p>
+<p><strong>Redis版本：redis-6.2.5</strong></p>
+
+      
+    </div>
+    
+    
+    
+
+    
+
+    
+
+    
+
+    <footer class="post-footer">
+      
+        <div class="post-tags">
+          
+            <a href="/tags/Redis/" rel="tag"># Redis</a>
+          
+        </div>
+      
+
+      
+      
+      
+
+      
+        <div class="post-nav">
+          <div class="post-nav-next post-nav-item">
+            
+              <a href="/2022/04/30/【Redis】事件驱动框架（多线程）/" rel="next" title="【Redis】事件驱动源码分析（多线程）">
+                <i class="fa fa-chevron-left"></i> 【Redis】事件驱动源码分析（多线程）
+              </a>
+            
+          </div>
+
+          <span class="post-nav-divider"></span>
+
+          <div class="post-nav-prev post-nav-item">
+            
+              <a href="/2022/05/11/【Redis】客观下线/" rel="prev" title="【Redis】客观下线">
+                【Redis】客观下线 <i class="fa fa-chevron-right"></i>
+              </a>
+            
+          </div>
+        </div>
+      
+
+      
+      
+    </footer>
+  </div>
+  
+  
+  
+  </article>
+
+
+
+    <div class="post-spread">
+      
+    </div>
+  </div>
+
+
+          </div>
+          
+
+
+          
+
+  
+
+
+
+        </div>
+        
+          
+  
+  <div class="sidebar-toggle">
+    <div class="sidebar-toggle-line-wrap">
+      <span class="sidebar-toggle-line sidebar-toggle-line-first"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-middle"></span>
+      <span class="sidebar-toggle-line sidebar-toggle-line-last"></span>
+    </div>
+  </div>
+
+  <aside id="sidebar" class="sidebar">
+    
+    <div class="sidebar-inner">
+
+      
+
+      
+        <ul class="sidebar-nav motion-element">
+          <li class="sidebar-nav-toc sidebar-nav-active" data-target="post-toc-wrap">
+            Table of Contents
+          </li>
+          <li class="sidebar-nav-overview" data-target="site-overview-wrap">
+            Overview
+          </li>
+        </ul>
+      
+
+      <section class="site-overview-wrap sidebar-panel">
+        <div class="site-overview">
+          <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+            
+              <p class="site-author-name" itemprop="name">shan</p>
+              <p class="site-description motion-element" itemprop="description"></p>
+          </div>
+
+          <nav class="site-state motion-element">
+
+            
+              <div class="site-state-item site-state-posts">
+              
+                <a href="/archives/">
+              
+                  <span class="site-state-item-count">53</span>
+                  <span class="site-state-item-name">posts</span>
+                </a>
+              </div>
+            
+
+            
+
+            
+              
+              
+              <div class="site-state-item site-state-tags">
+                
+                  <span class="site-state-item-count">12</span>
+                  <span class="site-state-item-name">tags</span>
+                
+              </div>
+            
+
+          </nav>
+
+          
+
+          
+
+          
+          
+
+          
+          
+
+          
+
+        </div>
+      </section>
+
+      
+      <!--noindex-->
+        <section class="post-toc-wrap motion-element sidebar-panel sidebar-panel-active">
+          <div class="post-toc">
+
+            
+              
+            
+
+            
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#哨兵初始化"><span class="nav-number">1.</span> <span class="nav-text">哨兵初始化</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#哨兵模式校验"><span class="nav-number">1.1.</span> <span class="nav-text">哨兵模式校验</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#初始化配置项"><span class="nav-number">1.2.</span> <span class="nav-text">初始化配置项</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#启动哨兵实例"><span class="nav-number">2.</span> <span class="nav-text">启动哨兵实例</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#哨兵时间事件"><span class="nav-number">3.</span> <span class="nav-text">哨兵时间事件</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#检测哨兵监听的节点状态"><span class="nav-number">3.1.</span> <span class="nav-text">检测哨兵监听的节点状态</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#重新连接"><span class="nav-number">3.1.1.</span> <span class="nav-text">重新连接</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#发送命令"><span class="nav-number">3.1.2.</span> <span class="nav-text">发送命令</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#主观下线"><span class="nav-number">3.1.3.</span> <span class="nav-text">主观下线</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#客观下线"><span class="nav-number">3.1.4.</span> <span class="nav-text">客观下线</span></a></li></ol></li></ol></li></ol></div>
+            
+
+          </div>
+        </section>
+      <!--/noindex-->
+      
+
+      
+
+    </div>
+  </aside>
+
+
+        
+      </div>
+    </main>
+
+    <footer id="footer" class="footer">
+      <div class="footer-inner">
+        <div class="copyright">&copy; <span itemprop="copyrightYear">2022</span>
+  <span class="with-love">
+    <i class="fa fa-user"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">shan</span>
+
+  
+</div>
+
+
+  <div class="powered-by">Powered by <a class="theme-link" target="_blank" href="https://hexo.io">Hexo</a></div>
+
+
+
+  <span class="post-meta-divider">|</span>
+
+
+
+  <div class="theme-info">Theme &mdash; <a class="theme-link" target="_blank" href="https://github.com/iissnan/hexo-theme-next">NexT.Muse</a> v5.1.4</div>
+
+
+
+
+        
+
+
+
+
+
+
+
+        
+      </div>
+    </footer>
+
+    
+      <div class="back-to-top">
+        <i class="fa fa-arrow-up"></i>
+        
+      </div>
+    
+
+    
+
+  </div>
+
+  
+
+<script type="text/javascript">
+  if (Object.prototype.toString.call(window.Promise) !== '[object Function]') {
+    window.Promise = null;
+  }
+</script>
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery/index.js?v=2.1.3"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fastclick/lib/fastclick.min.js?v=1.0.6"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/jquery_lazyload/jquery.lazyload.js?v=1.9.7"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/velocity/velocity.ui.min.js?v=1.2.1"></script>
+  
+
+  
+  
+    <script type="text/javascript" src="/lib/fancybox/source/jquery.fancybox.pack.js?v=2.1.5"></script>
+  
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/utils.js?v=5.1.4"></script>
+
+  <script type="text/javascript" src="/js/src/motion.js?v=5.1.4"></script>
+
+
+
+  
+  
+
+  
+  <script type="text/javascript" src="/js/src/scrollspy.js?v=5.1.4"></script>
+<script type="text/javascript" src="/js/src/post-details.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  <script type="text/javascript" src="/js/src/bootstrap.js?v=5.1.4"></script>
+
+
+
+  
+
+
+  
+
+
+
+
+	
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+  
+
+  
+
+  
+
+  
+  
+
+  
+
+  
+
+  
+
+</body>
+</html>
